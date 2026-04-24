@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Search, Bell, Plus, LayoutGrid, ChevronDown } from "lucide-react";
+import Image from "next/image";
+import { Search, Bell, Plus, ChevronDown } from "lucide-react";
+import boardifyLogo from "../../../asset/Boardify.png";
 
 interface NavBarProps {
   onNewTask: () => void;
@@ -11,13 +13,13 @@ export function NavBar({ onNewTask }: NavBarProps) {
   return (
     <nav className="h-16 bg-white border-b border-gray-100 flex items-center px-6 gap-4 sticky top-0 z-50" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
       {/* Logo */}
-      <div className="flex items-center gap-2.5 min-w-fit">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-          <LayoutGrid size={16} className="text-white" />
-        </div>
-        <span className="text-gray-900 tracking-tight" style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
-          Board<span style={{ color: "#6366f1" }}>ify</span>
-        </span>
+      <div className="flex items-center min-w-fit">
+        <Image
+          src={boardifyLogo}
+          alt="Boardify logo"
+          className="h-9 w-auto"
+          priority
+        />
       </div>
 
       {/* Project selector */}
