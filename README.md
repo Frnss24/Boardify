@@ -1,5 +1,5 @@
 
-  # Design Kanban Board App
+  # Design Kanban Board App (Boardify)
 
   This is a code bundle for Design Kanban Board App. The original project is available at https://www.figma.com/design/spMhcFtJhRaZzORdcMuE3O/Design-Kanban-Board-App.
 
