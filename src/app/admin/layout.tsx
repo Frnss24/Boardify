@@ -2,6 +2,7 @@
 import { LayoutDashboard, Users, Settings } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import boardifyLogo from '../../../asset/Boardify.png';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Logo Section */}
           <div className="flex items-center gap-2 mb-1">
             <Image 
-              src="/logo.jpeg" // Nama file harus persis (Case Sensitive)
+              src={boardifyLogo}
               alt="Boardify Logo" 
               width={32} 
               height={32} 
