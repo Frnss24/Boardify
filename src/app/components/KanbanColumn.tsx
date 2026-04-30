@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { motion } from "motion/react";
+import { useDrop } from "react-dnd";
 import { TaskCard, Task } from "./TaskCard";
 
 export type ColumnType = "todo" | "doing" | "done";
@@ -48,10 +49,26 @@ interface KanbanColumnProps {
   type: ColumnType;
   tasks: Task[];
   onAddTask: (column: ColumnType) => void;
+  onMoveTask?: (taskId: string, from: ColumnType, to: ColumnType) => void;
 }
 
-export function KanbanColumn({ type, tasks, onAddTask }: KanbanColumnProps) {
+export function KanbanColumn({ type, tasks, onAddTask, onMoveTask }: KanbanColumnProps) {
   const config = columnConfigs[type];
+
+  const [, dropRef] = useDrop(() => ({
+    accept: "TASK",
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
+    drop: (item: any, monitor) => {
+      const fromColumn = item.from as ColumnType | undefined;
+      // If item includes source column, use it; otherwise skip
+      if (item.id && typeof item.id === "string" && onMoveTask && fromColumn) {
+        onMoveTask(item.id, fromColumn, type);
+      } else if (item.id && typeof item.id === "string" && onMoveTask && !fromColumn) {
+        // best-effort: try moving without known source
+        onMoveTask(item.id, type, type);
+      }
+    },
+  }), [type, onMoveTask]);
 
   return (
     <motion.div
@@ -107,9 +124,9 @@ export function KanbanColumn({ type, tasks, onAddTask }: KanbanColumnProps) {
       <div className="h-px mx-4" style={{ background: `${config.accent}18` }} />
 
       {/* Cards scroll area */}
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3" style={{ maxHeight: "calc(100vh - 160px)" }}>
+      <div ref={dropRef as any} className="flex-1 overflow-y-auto p-3 flex flex-col gap-3" style={{ maxHeight: "calc(100vh - 160px)" }}>
         {tasks.map((task, index) => (
-          <TaskCard key={task.id} task={task} index={index} />
+          <TaskCard key={task.id} task={task} index={index} column={type} />
         ))}
 
         {/* Empty state */}

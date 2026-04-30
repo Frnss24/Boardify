@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDrag } from "react-dnd";
 import { MoreHorizontal, MessageSquare, Paperclip, Calendar } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -44,9 +45,16 @@ const avatarColors = [
 interface TaskCardProps {
   task: Task;
   index: number;
+  column?: import("./KanbanColumn").ColumnType;
 }
 
-export function TaskCard({ task, index }: TaskCardProps) {
+export function TaskCard({ task, index, column }: TaskCardProps) {
+  const [{ isDragging }, dragRef] = useDrag(() => ({
+    type: "TASK",
+    item: { id: task.id, from: column },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  }), [task.id, column]);
+
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const priority = priorityConfig[task.priority];
@@ -54,6 +62,7 @@ export function TaskCard({ task, index }: TaskCardProps) {
 
   return (
     <motion.div
+      ref={dragRef as any}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: index * 0.06 }}
@@ -61,6 +70,7 @@ export function TaskCard({ task, index }: TaskCardProps) {
       onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
       className="relative bg-white rounded-2xl p-4 cursor-pointer transition-all duration-200"
       style={{
+        opacity: isDragging ? 0.4 : 1,
         boxShadow: hovered
           ? "0 8px 24px rgba(0,0,0,0.09), 0 2px 8px rgba(99,102,241,0.08)"
           : "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",

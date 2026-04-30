@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react";
 import { Filter, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
 import { NavBar } from "./components/NavBar";
@@ -154,6 +156,20 @@ export default function App() {
     }));
   };
 
+  const handleMoveTask = (taskId: string, from: ColumnType, to: ColumnType) => {
+    if (from === to) return;
+    setTasks((prev) => {
+      const fromList = prev[from].filter((t) => t.id !== taskId);
+      const moved = prev[from].find((t) => t.id === taskId);
+      if (!moved) return prev;
+      return {
+        ...prev,
+        [from]: fromList,
+        [to]: [moved, ...prev[to]],
+      };
+    });
+  };
+
   const completed = tasks.done.length;
   const inProgress = tasks.doing.length;
   const pending = tasks.todo.length;
@@ -238,16 +254,19 @@ export default function App() {
 
       {/* Kanban board */}
       <div className="flex-1 px-6 pb-8">
-        <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
-          {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
-            <KanbanColumn
-              key={col}
-              type={col}
-              tasks={tasks[col]}
-              onAddTask={openModal}
-            />
-          ))}
-        </div>
+        <DndProvider backend={HTML5Backend}>
+          <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
+            {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
+              <KanbanColumn
+                key={col}
+                type={col}
+                tasks={tasks[col]}
+                onAddTask={openModal}
+                onMoveTask={handleMoveTask}
+              />
+            ))}
+          </div>
+        </DndProvider>
       </div>
 
       {/* New Task Modal */}
