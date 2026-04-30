@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronLeft, User, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import boardifyLogo from '../../../asset/Boardify.png';
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('');
@@ -121,7 +122,7 @@ export default function LoginPage() {
           <div className="flex flex-col items-center">
             <div className="w-32 h-32 relative mb-4">
               <Image 
-                src="/Boardify.png" 
+                src={boardifyLogo}
                 alt="Boardify Logo" 
                 fill 
                 className="object-contain"

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronLeft, User, Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import boardifyLogo from '../../../asset/Boardify.png';
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
@@ -60,7 +61,7 @@ export default function RegisterPage() {
         <div className="hidden md:flex flex-[0.8] bg-white p-12 flex flex-col items-center justify-center relative border-r border-slate-100">
           <div className="flex flex-col items-center text-center">
             <div className="w-32 h-32 relative mb-4">
-              <Image src="/Boardify.png" alt="Boardify Logo" fill className="object-contain" priority />
+              <Image src={boardifyLogo} alt="Boardify Logo" fill className="object-contain" priority />
             </div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tighter">Boardify</h2>
           </div>
