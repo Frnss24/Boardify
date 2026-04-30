@@ -5,8 +5,25 @@ import { ChevronLeft, User, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'l
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr'; 
 import boardifyLogo from '../../../asset/Boardify.png'; 
+
+const DEMO_ACCOUNTS = {
+  admin: {
+    email: 'admin@boardify.test',
+    password: 'Admin123!',
+    role: 'admin',
+  },
+  user: {
+    email: 'user@boardify.test',
+    password: 'User123!',
+    role: 'user',
+  },
+} as const;
+
+function setDemoAuthCookie(role: 'admin' | 'user', email: string) {
+  const cookieValue = `boardify_demo_auth=${encodeURIComponent(JSON.stringify({ role, email }))}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+  document.cookie = cookieValue;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,11 +32,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,34 +44,22 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: identifier,
-      password: password,
-    });
+    const normalizedEmail = identifier.trim().toLowerCase();
+    const demoAccount =
+      normalizedEmail === DEMO_ACCOUNTS.admin.email
+        ? DEMO_ACCOUNTS.admin
+        : normalizedEmail === DEMO_ACCOUNTS.user.email
+          ? DEMO_ACCOUNTS.user
+          : null;
 
-    if (signInError || !authData.user) {
-      setError('Login gagal! Cek kembali email atau password.');
-      setIsLoading(false);
+    if (demoAccount && password === demoAccount.password) {
+      setDemoAuthCookie(demoAccount.role, demoAccount.email);
+      router.push(demoAccount.role === 'admin' ? '/admin' : '/user');
       return;
     }
 
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', authData.user.id)
-      .single();
-
-    if (profileError) {
-      setError('Gagal mengambil data profil!');
-      setIsLoading(false);
-      return;
-    }
-
-    if (profileData?.role === 'admin') {
-      router.push('/admin');
-    } else {
-      router.push('/user'); 
-    }
+    setError('Akun demo tidak cocok. Pakai akun test yang ada di bawah.');
+    setIsLoading(false);
   };
 
   return (
@@ -148,6 +148,12 @@ export default function LoginPage() {
                     </span>
                   </Link>
                 </p>
+
+                <div className="mt-2 w-full rounded-2xl border border-dashed border-slate-300 bg-white/30 p-3 text-left text-[11px] text-slate-600">
+                  <p className="font-black uppercase tracking-widest text-slate-700 mb-2">Demo Accounts</p>
+                  <p>Admin: admin@boardify.test / Admin123!</p>
+                  <p>User: user@boardify.test / User123!</p>
+                </div>
               </div>
             </form>
           </div>

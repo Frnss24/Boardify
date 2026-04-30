@@ -1,6 +1,31 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
+type DemoAuth = {
+  role: 'admin' | 'user';
+  email: string;
+};
+
+function getDemoAuth(request: NextRequest): DemoAuth | null {
+  const raw = request.cookies.get('boardify_demo_auth')?.value;
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw)) as Partial<DemoAuth>;
+
+    if ((parsed.role === 'admin' || parsed.role === 'user') && typeof parsed.email === 'string') {
+      return { role: parsed.role, email: parsed.email };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -36,8 +61,13 @@ export async function middleware(request: NextRequest) {
 
   // get session
   const { data: { session } } = await supabase.auth.getSession();
+  const demoAuth = getDemoAuth(request);
 
   const path = request.nextUrl.pathname;
+
+  const activeRole = session
+    ? undefined
+    : demoAuth?.role;
 
   // auto ke lgoin
   if (path === '/') {
@@ -45,22 +75,22 @@ export async function middleware(request: NextRequest) {
   }
 
   // proteksi hal kalo belom login
-  if (!session && (path.startsWith('/user') || path.startsWith('/admin'))) {
+  if (!session && !demoAuth && (path.startsWith('/user') || path.startsWith('/admin'))) {
     // mau masuk tp belum login
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // cek role
-  if (session) {
+  // cek role untuk session Supabase atau akun demo lokal
+  if (session || demoAuth) {
+    const userRole = session
+      ? (await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()).data?.role
+      : activeRole;
+
     // Ambil data role dari tabel profiles
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
-
-    const userRole = profile?.role;
-
     // kalo dah login tapi mau buka halaman login lagi, lempar balik ke halaman masing-masing
     if (path.startsWith('/login')) {
       if (userRole === 'admin') {
