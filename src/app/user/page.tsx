@@ -4,17 +4,17 @@ import { useState } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react"; 
-import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut } from "lucide-react"; // <-- Tambahin icon LogOut
+import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut } from "lucide-react"; 
 import { NavBar } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { Task } from "../components/TaskCard";
 
-// TAMBAHAN: Import buat fungsi Logout
+// impor buat fungsi Logout
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 
-// Data dummy (Sengaja aing biarin utuh biar UI lu nggak error)
+// Data dummy 
 const initialTasks: Record<ColumnType, Task[]> = {
   todo: [
     {
@@ -150,13 +150,12 @@ export default function UserDashboard() {
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
   const [viewMode] = useState<"grid" | "list">("grid");
 
-  // Inisialisasi Supabase buat jalanin fungsi Logout
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // FUNGSI LOGOUT KUSUS USER
+  // fungsi logout user
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');

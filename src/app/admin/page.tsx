@@ -1,4 +1,4 @@
-"use client"; // Wajib ditambahin karena kita butuh fungsi onClick (Logout)
+"use client"; 
 
 import { 
   Users, CheckCircle2, ListTodo, Search, Bell, 
@@ -19,21 +19,18 @@ const recentTasks = [
 export default function DashboardPage() {
   const router = useRouter();
 
-  // Inisialisasi Supabase buat jalanin fungsi Logout
+  // inisialisasi supabase buat jalanin fungsi Logout
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // FUNGSI LOGOUT (DESTROY SESSION)
+  // function logout
   const handleLogout = async () => {
-    // 1. Hapus sesi di database/browser
     await supabase.auth.signOut();
     
-    // 2. Lempar balik ke halaman login
     router.push('/login');
     
-    // 3. Refresh router biar cache-nya beneran bersih
     router.refresh();
   };
 

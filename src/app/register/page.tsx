@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { ChevronLeft, User, Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation'; // Buat pindah halaman
-import { createBrowserClient } from '@supabase/ssr'; // Mesin Supabase
-import boardifyLogo from '../../../asset/Boardify.png'; // Sesuaiin path-nya
+import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
+import boardifyLogo from '../../../asset/Boardify.png'; 
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,10 +14,10 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Tambahan state loading
+  const [isLoading, setIsLoading] = useState(false); 
   const [error, setError] = useState('');
 
-  // Inisialisasi Supabase
+  // inisialisasi supabase
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -27,22 +27,22 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    // Regex untuk cek minimal 1 karakter spesial/unik
+    // cek minimal 1 karakter spesial/unik
     const specialCharRegx = /[!@#$%^&*(),.?":{}|<>]/;
 
-    // 1. CEK KOSONG
+    // cek kosong
     if (!fullName.trim() || !email.trim() || !password.trim()) {
-      setError('Wajib diisi semua! Jangan ada yang kosong ya bro.');
+      setError('Wajib diisi semua!');
       return;
     }
 
-    // 2. CEK PANJANG PASSWORD
+    // cek panjang pw
     if (password.length < 8) {
       setError('Password minimal harus 8 karakter!');
       return;
     }
 
-    // 3. CEK KARAKTER UNIK
+    // cek karakter unik
     if (!specialCharRegx.test(password)) {
       setError('Password harus punya minimal 1 karakter unik (contoh: @, #, $)!');
       return;
@@ -50,37 +50,37 @@ export default function RegisterPage() {
 
     setIsLoading(true);
 
-    // 4. Proses Daftar ke Supabase Auth
+    //daftarin ke supabase auth
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: email,
       password: password,
     });
 
     if (signUpError) {
-      setError(signUpError.message); // Nampilin error dari Supabase (misal: email udah kepake)
+      setError(signUpError.message); 
       setIsLoading(false);
       return;
     }
 
-    // 5. Masukin profilnya ke tabel 'profiles' secara otomatis
+    // masuk ke tabel profiles
     if (authData.user) {
       const { error: profileError } = await supabase.from('profiles').insert([
         {
           id: authData.user.id,
           name: fullName,
           email: email,
-          role: 'user' // Otomatis jadi user biasa
+          role: 'user' 
         }
       ]);
 
       if (profileError) {
-        setError('Akun berhasil dibuat, tapi gagal nyimpen profil!');
+        setError('Akun berhasil dibuat, tapi gagal mwnyimpan profil!');
         setIsLoading(false);
         return;
       }
     }
 
-    // 6. Kalau sukses semua, lempar langsung ke halaman User Dashboard
+    // kalau sukses, arahin langsung ke halaman User Dashboard
     router.push('/user');
   };
 

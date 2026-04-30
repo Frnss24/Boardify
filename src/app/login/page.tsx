@@ -5,9 +5,8 @@ import { ChevronLeft, User, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'l
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-// 1. Ganti import dari supabase-js jadi ssr
 import { createBrowserClient } from '@supabase/ssr'; 
-import boardifyLogo from '../../../asset/Boardify.png'; // Sesuaiin kalau path logo beda
+import boardifyLogo from '../../../asset/Boardify.png'; 
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,7 +16,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 2. Panggil createBrowserClient di dalam komponen
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -28,7 +26,7 @@ export default function LoginPage() {
     setError('');
 
     if (!identifier.trim() || !password.trim()) {
-      setError('Wajib diisi semua! Jangan dikosongin ya bro.');
+      setError('Semua field wajib diisi!');
       return;
     }
 
@@ -40,7 +38,7 @@ export default function LoginPage() {
     });
 
     if (signInError || !authData.user) {
-      setError('Login gagal! Cek lagi email atau password lu.');
+      setError('Login gagal! Cek kembali email atau password.');
       setIsLoading(false);
       return;
     }
@@ -52,20 +50,17 @@ export default function LoginPage() {
       .single();
 
     if (profileError) {
-      setError('Gagal ngambil data profil!');
+      setError('Gagal mengambil data profil!');
       setIsLoading(false);
       return;
     }
 
-    // 3. Pastikan rutenya ngelempar ke /user, bukan /dashboard
     if (profileData?.role === 'admin') {
       router.push('/admin');
     } else {
       router.push('/user'); 
     }
   };
-
-  // ... (Kodingan UI ke bawahnya alias tulisan return ( <div className="min-h-screen... dst biarin aja nggak usah diubah)
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative bg-[#E0F2F1] overflow-hidden font-sans">
