@@ -4,29 +4,68 @@ import { useState } from 'react';
 import { ChevronLeft, User, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import boardifyLogo from '../../../asset/Boardify.png';
+import { useRouter } from 'next/navigation';
+// 1. Ganti import dari supabase-js jadi ssr
+import { createBrowserClient } from '@supabase/ssr'; 
+import boardifyLogo from '../../../asset/Boardify.png'; // Sesuaiin kalau path logo beda
 
 export default function LoginPage() {
+  const router = useRouter();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
-  // State untuk validasi dan error
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  // 2. Panggil createBrowserClient di dalam komponen
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validasi: Cek apakah ada kolom yang kosong
     if (!identifier.trim() || !password.trim()) {
       setError('Wajib diisi semua! Jangan dikosongin ya bro.');
       return;
     }
 
-    // Simulasi Login
-    console.log("Mencoba Login...", { identifier, password });
+    setIsLoading(true);
+
+    const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: identifier,
+      password: password,
+    });
+
+    if (signInError || !authData.user) {
+      setError('Login gagal! Cek lagi email atau password lu.');
+      setIsLoading(false);
+      return;
+    }
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError) {
+      setError('Gagal ngambil data profil!');
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Pastikan rutenya ngelempar ke /user, bukan /dashboard
+    if (profileData?.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/user'); 
+    }
   };
+
+  // ... (Kodingan UI ke bawahnya alias tulisan return ( <div className="min-h-screen... dst biarin aja nggak usah diubah)
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative bg-[#E0F2F1] overflow-hidden font-sans">
@@ -62,16 +101,15 @@ export default function LoginPage() {
 
             <form className="space-y-8 text-left max-w-[320px] mx-auto" onSubmit={handleLogin}>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-1">USER NAME</label>
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-1">EMAIL</label>
                 <div className="relative group">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-600 transition-colors" size={16} />
                   <input 
-                    type="text" 
+                    type="email" 
                     value={identifier}
                     onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
-                    // bg-white/20 pas idle, berubah jadi bg-white pas focus/ngetik
                     className="w-full bg-white/20 border-2 border-white/40 rounded-full py-2.5 pl-12 pr-6 text-slate-800 outline-none focus:border-white focus:bg-white transition-all placeholder:text-slate-500"
-                    placeholder="Enter username"
+                    placeholder="admin@boardify.com"
                   />
                 </div>
               </div>
@@ -84,7 +122,6 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                    // bg-white/20 pas idle, berubah jadi bg-white pas focus/ngetik
                     className="w-full bg-white/20 border-2 border-white/40 rounded-full py-2.5 pl-12 pr-12 text-slate-800 outline-none focus:border-white focus:bg-white transition-all placeholder:text-slate-500"
                     placeholder="••••••••"
                   />
@@ -99,9 +136,13 @@ export default function LoginPage() {
               </div>
 
               <div className="pt-4 flex flex-col items-center gap-4">
-                <button type="submit" className="w-full bg-indigo-600 text-white font-black py-2.5 rounded-full shadow-lg hover:bg-indigo-700 transition-all active:scale-[0.97] uppercase tracking-widest text-sm flex items-center justify-center gap-2">
-                  SIGN IN
-                  <ArrowRight size={18} />
+                <button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="w-full bg-indigo-600 text-white font-black py-2.5 rounded-full shadow-lg hover:bg-indigo-700 transition-all active:scale-[0.97] uppercase tracking-widest text-sm flex items-center justify-center gap-2 disabled:bg-indigo-400"
+                >
+                  {isLoading ? 'LOADING...' : 'SIGN IN'}
+                  {!isLoading && <ArrowRight size={18} />}
                 </button>
                 
                 <p className="text-[12px] text-slate-500 font-medium tracking-tight">

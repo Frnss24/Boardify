@@ -4,23 +4,33 @@ import { useState } from 'react';
 import { ChevronLeft, User, Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import boardifyLogo from '../../../asset/Boardify.png';
+import { useRouter } from 'next/navigation'; // Buat pindah halaman
+import { createBrowserClient } from '@supabase/ssr'; // Mesin Supabase
+import boardifyLogo from '../../../asset/Boardify.png'; // Sesuaiin path-nya
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Tambahan state loading
   const [error, setError] = useState('');
 
-  const handleRegister = (e: React.FormEvent) => {
+  // Inisialisasi Supabase
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     // Regex untuk cek minimal 1 karakter spesial/unik
     const specialCharRegx = /[!@#$%^&*(),.?":{}|<>]/;
 
-    // 1. CEK KOSONG (Wajib diisi semua)
+    // 1. CEK KOSONG
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       setError('Wajib diisi semua! Jangan ada yang kosong ya bro.');
       return;
@@ -38,9 +48,40 @@ export default function RegisterPage() {
       return;
     }
 
-    // Jika lolos semua validasi
-    console.log("Registrasi Berhasil untuk proyek Boardify:", { fullName, email, password });
-    // Lanjut ke logika backend untuk Recipeat atau Smart Library API
+    setIsLoading(true);
+
+    // 4. Proses Daftar ke Supabase Auth
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+    });
+
+    if (signUpError) {
+      setError(signUpError.message); // Nampilin error dari Supabase (misal: email udah kepake)
+      setIsLoading(false);
+      return;
+    }
+
+    // 5. Masukin profilnya ke tabel 'profiles' secara otomatis
+    if (authData.user) {
+      const { error: profileError } = await supabase.from('profiles').insert([
+        {
+          id: authData.user.id,
+          name: fullName,
+          email: email,
+          role: 'user' // Otomatis jadi user biasa
+        }
+      ]);
+
+      if (profileError) {
+        setError('Akun berhasil dibuat, tapi gagal nyimpen profil!');
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    // 6. Kalau sukses semua, lempar langsung ke halaman User Dashboard
+    router.push('/user');
   };
 
   return (
@@ -72,7 +113,7 @@ export default function RegisterPage() {
           <div className="max-w-[340px] mx-auto w-full text-center">
             <h1 className="text-4xl font-black text-slate-800 tracking-widest uppercase mb-6">SIGN UP</h1>
             
-            {/* ALERT WARNING - Muncul kalau ada yang kosong atau salah */}
+            {/* ALERT WARNING */}
             <div className={`overflow-hidden transition-all duration-300 ${error ? 'max-h-20 mb-4' : 'max-h-0'}`}>
               <div className="bg-red-500 text-white p-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-red-200">
                 <AlertCircle size={20} className="shrink-0" />
@@ -130,9 +171,13 @@ export default function RegisterPage() {
               </div>
 
               <div className="pt-4 flex flex-col items-center gap-4">
-                <button type="submit" className="w-full bg-[#5145f5] text-white font-black py-3 rounded-full shadow-lg hover:bg-[#4338ca] transition-all active:scale-[0.97] uppercase tracking-widest text-sm flex items-center justify-center gap-2">
-                  GET STARTED
-                  <ArrowRight size={18} />
+                <button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="w-full bg-[#5145f5] text-white font-black py-3 rounded-full shadow-lg hover:bg-[#4338ca] transition-all active:scale-[0.97] uppercase tracking-widest text-sm flex items-center justify-center gap-2 disabled:bg-indigo-300"
+                >
+                  {isLoading ? 'PROCESSING...' : 'GET STARTED'}
+                  {!isLoading && <ArrowRight size={18} />}
                 </button>
                 <p className="text-[12px] text-slate-500 font-medium tracking-tight">
                   Already have an account?{' '}

@@ -3,13 +3,18 @@
 import { useState } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { motion } from "motion/react";
-import { Filter, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
-import { NavBar } from "./components/NavBar";
-import { KanbanColumn, ColumnType } from "./components/KanbanColumn";
-import { NewTaskModal } from "./components/NewTaskModal";
-import { Task } from "./components/TaskCard";
+import { motion } from "motion/react"; 
+import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut } from "lucide-react"; // <-- Tambahin icon LogOut
+import { NavBar } from "../components/NavBar";
+import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
+import { NewTaskModal } from "../components/NewTaskModal";
+import { Task } from "../components/TaskCard";
 
+// TAMBAHAN: Import buat fungsi Logout
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
+
+// Data dummy (Sengaja aing biarin utuh biar UI lu nggak error)
 const initialTasks: Record<ColumnType, Task[]> = {
   todo: [
     {
@@ -138,11 +143,25 @@ const initialTasks: Record<ColumnType, Task[]> = {
 
 const totalTasks = Object.values(initialTasks).reduce((acc, col) => acc + col.length, 0);
 
-export default function App() {
+export default function UserDashboard() {
+  const router = useRouter(); // <-- Siapin router buat pindah halaman
   const [tasks, setTasks] = useState<Record<ColumnType, Task[]>>(initialTasks);
   const [modalOpen, setModalOpen] = useState(false);
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
   const [viewMode] = useState<"grid" | "list">("grid");
+
+  // Inisialisasi Supabase buat jalanin fungsi Logout
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  // FUNGSI LOGOUT KUSUS USER
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
 
   const openModal = (column: ColumnType = "todo") => {
     setDefaultColumn(column);
@@ -194,7 +213,7 @@ export default function App() {
             </p>
           </div>
 
-          {/* Toolbar */}
+          {/* Toolbar & Logout */}
           <div className="flex items-center gap-2">
             {/* Stats pills */}
             <div className="hidden md:flex items-center gap-2 mr-2">
@@ -222,7 +241,7 @@ export default function App() {
               <SlidersHorizontal size={14} />
               <span className="hidden sm:inline">Sort</span>
             </button>
-            <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
+            <div className="flex items-center rounded-xl overflow-hidden mr-2" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
               <button className="flex items-center px-3 py-2 transition-colors" style={{ background: viewMode === "grid" ? "white" : "transparent", color: viewMode === "grid" ? "#6366f1" : "#9ca3af" }}>
                 <LayoutGrid size={15} />
               </button>
@@ -230,6 +249,17 @@ export default function App() {
                 <List size={15} />
               </button>
             </div>
+
+            {/* TOMBOL LOGOUT MERAH */}
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-600 font-bold hover:bg-red-50 transition-colors" 
+              style={{ border: "1px solid rgba(239, 68, 68, 0.2)", background: "white" }}
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+
           </div>
         </div>
       </div>

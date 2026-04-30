@@ -1,8 +1,11 @@
-// src/app/admin/page.tsx
+"use client"; // Wajib ditambahin karena kita butuh fungsi onClick (Logout)
+
 import { 
   Users, CheckCircle2, ListTodo, Search, Bell, 
-  TrendingUp, TrendingDown, MoreHorizontal, Clock
+  TrendingUp, TrendingDown, MoreHorizontal, Clock, LogOut 
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 
 // Data sementara (Mock Data)
 const recentTasks = [
@@ -14,8 +17,28 @@ const recentTasks = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
+
+  // Inisialisasi Supabase buat jalanin fungsi Logout
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  // FUNGSI LOGOUT (DESTROY SESSION)
+  const handleLogout = async () => {
+    // 1. Hapus sesi di database/browser
+    await supabase.auth.signOut();
+    
+    // 2. Lempar balik ke halaman login
+    router.push('/login');
+    
+    // 3. Refresh router biar cache-nya beneran bersih
+    router.refresh();
+  };
+
   return (
-    <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
+    <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto p-6">
       
       {/* Top Header */}
       <div className="flex justify-between items-center">
@@ -27,6 +50,15 @@ export default function DashboardPage() {
           </div>
           <button className="p-2 bg-white border rounded-full text-gray-500 hover:text-blue-600 shadow-sm">
             <Bell size={20} />
+          </button>
+          
+          {/* TOMBOL LOGOUT BARU */}
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-100 rounded-full text-red-600 font-medium transition-colors shadow-sm"
+          >
+            <LogOut size={18} />
+            <span className="text-sm">Logout</span>
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
-import App from "./App";
+import { redirect } from 'next/navigation';
 
-export default function Page() {
-  return <App />;
+export default function RootPage() {
+  redirect('/login');
 }
