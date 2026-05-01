@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react"; 
@@ -162,10 +162,10 @@ export default function UserDashboard() {
     router.refresh();
   };
 
-  const openModal = (column: ColumnType = "todo") => {
+  const openModal = useCallback((column: ColumnType = "todo") => {
     setDefaultColumn(column);
     setModalOpen(true);
-  };
+  }, []);
 
   const handleAddTask = (task: Task, column: ColumnType) => {
     setTasks((prev) => ({
@@ -174,7 +174,7 @@ export default function UserDashboard() {
     }));
   };
 
-  const handleMoveTask = (taskId: string, from: ColumnType, to: ColumnType) => {
+  const handleMoveTask = useCallback((taskId: string, from: ColumnType, to: ColumnType) => {
     if (from === to) return;
     setTasks((prev) => {
       const fromList = prev[from].filter((t) => t.id !== taskId);
@@ -186,7 +186,7 @@ export default function UserDashboard() {
         [to]: [moved, ...prev[to]],
       };
     });
-  };
+  }, []);
 
   const completed = tasks.done.length;
   const inProgress = tasks.doing.length;

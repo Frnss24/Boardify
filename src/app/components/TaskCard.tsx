@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useDrag } from "react-dnd";
 import { MoreHorizontal, MessageSquare, Paperclip, Calendar } from "lucide-react";
 import { motion } from "motion/react";
@@ -49,11 +49,13 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, index, column }: TaskCardProps) {
+  const dragItem = useMemo(() => ({ id: task.id, from: column }), [task.id, column]);
+  
   const [{ isDragging }, dragRef] = useDrag(() => ({
     type: "TASK",
-    item: { id: task.id, from: column },
+    item: dragItem,
     collect: (monitor) => ({ isDragging: monitor.isDragging() }),
-  }), [task.id, column]);
+  }), [dragItem]);
 
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { useDrop } from "react-dnd";
+import { useCallback } from "react";
 import { TaskCard, Task } from "./TaskCard";
 
 export type ColumnType = "todo" | "doing" | "done";
@@ -55,20 +56,18 @@ interface KanbanColumnProps {
 export function KanbanColumn({ type, tasks, onAddTask, onMoveTask }: KanbanColumnProps) {
   const config = columnConfigs[type];
 
-  const [, dropRef] = useDrop(() => ({
+  const handleDrop = useCallback((item: any) => {
+    const fromColumn = item.from as ColumnType | undefined;
+    if (item.id && typeof item.id === "string" && onMoveTask && fromColumn) {
+      onMoveTask(item.id, fromColumn, type);
+    }
+  }, [type, onMoveTask]);
+
+  const [{ isOver }, dropRef] = useDrop(() => ({
     accept: "TASK",
     collect: (monitor) => ({ isOver: monitor.isOver() }),
-    drop: (item: any, monitor) => {
-      const fromColumn = item.from as ColumnType | undefined;
-      // If item includes source column, use it; otherwise skip
-      if (item.id && typeof item.id === "string" && onMoveTask && fromColumn) {
-        onMoveTask(item.id, fromColumn, type);
-      } else if (item.id && typeof item.id === "string" && onMoveTask && !fromColumn) {
-        // best-effort: try moving without known source
-        onMoveTask(item.id, type, type);
-      }
-    },
-  }), [type, onMoveTask]);
+    drop: handleDrop,
+  }), [handleDrop]);
 
   return (
     <motion.div
