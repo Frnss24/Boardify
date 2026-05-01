@@ -3,15 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X } from "lucide-react";
+import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, FileClock } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import boardifyLogo from "../../../asset/Boardify.png";
 
+export type UserView = "board" | "timeline" | "reports";
+
 interface NavBarProps {
   onNewTask: () => void;
+  activeView: UserView;
+  onViewChange: (view: UserView) => void;
 }
 
-export function NavBar({ onNewTask }: NavBarProps) {
+export function NavBar({ onNewTask, activeView, onViewChange }: NavBarProps) {
   const router = useRouter();
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,6 +178,33 @@ export function NavBar({ onNewTask }: NavBarProps) {
 
       {/* Divider */}
       <div className="hidden md:block w-px h-5 bg-gray-200 mx-1" />
+
+      {/* Main view nav */}
+      <div className="hidden lg:flex items-center gap-1 rounded-xl p-1" style={{ background: "#f5f6fa" }}>
+        {[
+          { key: "board" as const, label: "Board", icon: LayoutGrid },
+          { key: "timeline" as const, label: "Timeline", icon: ChartNoAxesGantt },
+          { key: "reports" as const, label: "Reports", icon: FileClock },
+        ].map((item) => {
+          const isActive = activeView === item.key;
+          return (
+            <button
+              key={item.key}
+              onClick={() => onViewChange(item.key)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors"
+              style={{
+                background: isActive ? "white" : "transparent",
+                color: isActive ? "#4f46e5" : "#6b7280",
+                boxShadow: isActive ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                fontWeight: isActive ? 600 : 500,
+              }}
+            >
+              <item.icon size={14} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Search */}
       <div className={`relative flex-1 max-w-sm transition-all duration-200 ${searchFocused ? "max-w-md" : ""}`}>

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react"; 
-import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut } from "lucide-react"; 
-import { NavBar } from "../components/NavBar";
+import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History, KanbanSquare } from "lucide-react"; 
+import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { Task } from "../components/TaskCard";
@@ -143,11 +143,39 @@ const initialTasks: Record<ColumnType, Task[]> = {
 
 const totalTasks = Object.values(initialTasks).reduce((acc, col) => acc + col.length, 0);
 
+const monthMap: Record<string, number> = {
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  May: 4,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
+};
+
+function parseDueDate(label: string): Date {
+  const [monthName, dayText] = label.split(" ");
+  const month = monthMap[monthName] ?? 0;
+  const day = Number(dayText) || 1;
+  return new Date(new Date().getFullYear(), month, day);
+}
+
+function diffInDays(from: Date, to: Date): number {
+  const ms = to.getTime() - from.getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
 export default function UserDashboard() {
   const router = useRouter(); // <-- Siapin router buat pindah halaman
   const [tasks, setTasks] = useState<Record<ColumnType, Task[]>>(initialTasks);
   const [modalOpen, setModalOpen] = useState(false);
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
+  const [activeView, setActiveView] = useState<UserView>("board");
   const [viewMode] = useState<"grid" | "list">("grid");
 
   const supabase = createBrowserClient(
@@ -195,46 +223,85 @@ export default function UserDashboard() {
   const inProgress = tasks.doing.length;
   const pending = tasks.todo.length;
 
+  const timelineRows = useMemo(() => {
+    const rows = (["todo", "doing", "done"] as ColumnType[])
+      .flatMap((column) =>
+        tasks[column].map((task) => ({
+          ...task,
+          status: column,
+          due: parseDueDate(task.dueDate),
+        })),
+      )
+      .sort((a, b) => a.due.getTime() - b.due.getTime());
+
+    const anchor = rows.length > 0 ? new Date(rows[0].due) : new Date();
+    anchor.setDate(anchor.getDate() - 2);
+
+    return rows.map((row) => {
+      const start = Math.max(0, diffInDays(anchor, row.due) - 2);
+      const length = row.status === "done" ? 3 : row.status === "doing" ? 5 : 4;
+      return {
+        ...row,
+        start,
+        length,
+      };
+    });
+  }, [tasks]);
+
+  const reportRows = useMemo(() => {
+    const statusLabel: Record<ColumnType, string> = {
+      todo: "To Do",
+      doing: "Doing",
+      done: "Done",
+    };
+
+    return (["todo", "doing", "done"] as ColumnType[])
+      .flatMap((column) =>
+        tasks[column].map((task) => ({
+          id: task.id,
+          title: task.title,
+          assignees: task.assignees.join(", "),
+          priority: task.priority,
+          category: task.category,
+          dueDate: task.dueDate,
+          status: statusLabel[column],
+        })),
+      )
+      .sort((a, b) => parseDueDate(a.dueDate).getTime() - parseDueDate(b.dueDate).getTime());
+  }, [tasks]);
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f5f6fa 0%, #eef0f8 50%, #f0eef8 100%)" }}>
       {/* Nav */}
-      <NavBar onNewTask={() => openModal("todo")} />
+      <NavBar
+        onNewTask={() => openModal("todo")}
+        activeView={activeView}
+        onViewChange={setActiveView}
+      />
 
       {/* Board header */}
       <div className="px-6 pt-6 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600" style={{ fontWeight: 600 }}>Active Board</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600" style={{ fontWeight: 600 }}>
+                {activeView === "board" ? "Active Board" : activeView === "timeline" ? "Gantt Timeline" : "Task Reports"}
+              </span>
             </div>
             <h1 className="text-gray-900" style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.03em" }}>
-              Q2 Product Sprint
+              {activeView === "board" ? "Q2 Product Sprint" : activeView === "timeline" ? "Sprint Timeline" : "Task History Reports"}
             </h1>
             <p className="text-gray-400 mt-0.5" style={{ fontSize: "0.8rem" }}>
-              {totalTasks} total tasks · {completed} completed · {inProgress} in progress · {pending} pending
+              {activeView === "board"
+                ? `${totalTasks} total tasks · ${completed} completed · ${inProgress} in progress · ${pending} pending`
+                : activeView === "timeline"
+                  ? `Visual timeline for ${totalTasks} tasks across all statuses`
+                  : `Unified history from To Do, Doing, and Done (${totalTasks} tasks)`}
             </p>
           </div>
 
           {/* Toolbar & Logout */}
           <div className="flex items-center gap-2">
-            {/* Stats pills */}
-            <div className="hidden md:flex items-center gap-2 mr-2">
-              {[
-                { label: "Pending", count: pending, color: "#6366f1", bg: "#eef2ff" },
-                { label: "Active", count: inProgress, color: "#f59e0b", bg: "#fffbeb" },
-                { label: "Done", count: completed, color: "#10b981", bg: "#f0fdf4" },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs"
-                  style={{ background: stat.bg, color: stat.color, fontWeight: 600 }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: stat.color }} />
-                  {stat.count} {stat.label}
-                </div>
-              ))}
-            </div>
-
             <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
               <Filter size={14} />
               <span className="hidden sm:inline">Filter</span>
@@ -284,22 +351,99 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Kanban board */}
-      <div className="flex-1 px-6 pb-8">
-        <DndProvider backend={HTML5Backend}>
-          <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
-            {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
-              <KanbanColumn
-                key={col}
-                type={col}
-                tasks={tasks[col]}
-                onAddTask={openModal}
-                onMoveTask={handleMoveTask}
-              />
-            ))}
+      {activeView === "board" && (
+        <div className="flex-1 px-6 pb-8">
+          <DndProvider backend={HTML5Backend}>
+            <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
+              {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
+                <KanbanColumn
+                  key={col}
+                  type={col}
+                  tasks={tasks[col]}
+                  onAddTask={openModal}
+                  onMoveTask={handleMoveTask}
+                />
+              ))}
+            </div>
+          </DndProvider>
+        </div>
+      )}
+
+      {activeView === "timeline" && (
+        <div className="flex-1 px-6 pb-8">
+          <div className="rounded-2xl bg-white border border-gray-100 p-5" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
+            <div className="flex items-center gap-2 mb-4 text-gray-700" style={{ fontWeight: 600 }}>
+              <CalendarClock size={18} />
+              Gantt Timeline
+            </div>
+            <div className="space-y-3">
+              {timelineRows.map((item) => (
+                <div key={`${item.status}-${item.id}`} className="grid grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="pr-2">
+                    <p className="text-sm text-gray-800 truncate" style={{ fontWeight: 600 }}>{item.title}</p>
+                    <p className="text-xs text-gray-400">{item.status.toUpperCase()} • due {item.dueDate}</p>
+                  </div>
+                  <div className="h-8 rounded-lg relative overflow-hidden" style={{ background: "linear-gradient(90deg, #f8fafc, #f1f5f9)" }}>
+                    <div
+                      className="absolute top-1 bottom-1 rounded-md flex items-center px-2 text-[11px] text-white"
+                      style={{
+                        left: `${item.start * 3.1}%`,
+                        width: `${item.length * 3.1}%`,
+                        minWidth: "68px",
+                        background:
+                          item.status === "done"
+                            ? "linear-gradient(135deg, #10b981, #059669)"
+                            : item.status === "doing"
+                              ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                              : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                      }}
+                    >
+                      {item.priority}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </DndProvider>
-      </div>
+        </div>
+      )}
+
+      {activeView === "reports" && (
+        <div className="flex-1 px-6 pb-8">
+          <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2 text-gray-800" style={{ fontWeight: 700 }}>
+              <History size={18} />
+              All Task History
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                    <th className="px-5 py-3">Task</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Priority</th>
+                    <th className="px-5 py-3">Category</th>
+                    <th className="px-5 py-3">Assignees</th>
+                    <th className="px-5 py-3">Due</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportRows.map((row) => (
+                    <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/70">
+                      <td className="px-5 py-3 text-sm text-gray-800" style={{ fontWeight: 600 }}>{row.title}</td>
+                      <td className="px-5 py-3 text-sm text-gray-600">{row.status}</td>
+                      <td className="px-5 py-3 text-sm text-gray-600">{row.priority}</td>
+                      <td className="px-5 py-3 text-sm text-gray-600">{row.category}</td>
+                      <td className="px-5 py-3 text-sm text-gray-600">{row.assignees}</td>
+                      <td className="px-5 py-3 text-sm text-gray-500">{row.dueDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Task Modal */}
       <NewTaskModal
