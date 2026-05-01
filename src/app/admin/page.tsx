@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import { hapusDataPermanen } from '../../lib/api';
 
 // Data sementara (Mock Data)
 const recentTasks = [
@@ -52,6 +53,14 @@ export default function DashboardPage() {
             <Bell size={20} />
           </button>
           
+          {/* TOMBOL TESTING JOBDESK 12 */}
+          <button 
+            onClick={() => hapusDataPermanen(1)} 
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-full text-white font-medium transition-colors shadow-sm"
+          >
+            <span className="text-sm">Test Hapus ID 1</span>
+          </button>
+
           {/* TOMBOL LOGOUT BARU */}
           <button 
             onClick={handleLogout}
