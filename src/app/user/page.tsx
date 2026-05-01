@@ -4,17 +4,15 @@ import { useState, useCallback, useMemo } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react"; 
-import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History, KanbanSquare } from "lucide-react"; 
+import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History } from "lucide-react"; 
 import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { Task } from "../components/TaskCard";
 
-// impor buat fungsi Logout
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 
-// Data dummy 
 const initialTasks: Record<ColumnType, Task[]> = {
   todo: [
     {
@@ -144,18 +142,8 @@ const initialTasks: Record<ColumnType, Task[]> = {
 const totalTasks = Object.values(initialTasks).reduce((acc, col) => acc + col.length, 0);
 
 const monthMap: Record<string, number> = {
-  Jan: 0,
-  Feb: 1,
-  Mar: 2,
-  Apr: 3,
-  May: 4,
-  Jun: 5,
-  Jul: 6,
-  Aug: 7,
-  Sep: 8,
-  Oct: 9,
-  Nov: 10,
-  Dec: 11,
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
 };
 
 function parseDueDate(label: string): Date {
@@ -171,23 +159,40 @@ function diffInDays(from: Date, to: Date): number {
 }
 
 export default function UserDashboard() {
-  const router = useRouter(); // <-- Siapin router buat pindah halaman
+  const router = useRouter();
   const [tasks, setTasks] = useState<Record<ColumnType, Task[]>>(initialTasks);
   const [modalOpen, setModalOpen] = useState(false);
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
   const [activeView, setActiveView] = useState<UserView>("board");
   const [viewMode] = useState<"grid" | "list">("grid");
 
+  // ── SEARCH STATE (fitur tugasmu) ──────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filterTasks = (list: Task[]) => {
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        (t.description ?? "").toLowerCase().includes(q)
+    );
+  };
+
+  const filteredTasks = {
+    todo:  filterTasks(tasks.todo),
+    doing: filterTasks(tasks.doing),
+    done:  filterTasks(tasks.done),
+  };
+  // ─────────────────────────────────────────────────────────────
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // fungsi logout user
   const handleLogout = async () => {
-    // Hapus cookie demo auth
     document.cookie = 'boardify_demo_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
@@ -219,9 +224,9 @@ export default function UserDashboard() {
     });
   }, []);
 
-  const completed = tasks.done.length;
+  const completed  = tasks.done.length;
   const inProgress = tasks.doing.length;
-  const pending = tasks.todo.length;
+  const pending    = tasks.todo.length;
 
   const timelineRows = useMemo(() => {
     const rows = (["todo", "doing", "done"] as ColumnType[])
@@ -230,7 +235,7 @@ export default function UserDashboard() {
           ...task,
           status: column,
           due: parseDueDate(task.dueDate),
-        })),
+        }))
       )
       .sort((a, b) => a.due.getTime() - b.due.getTime());
 
@@ -238,13 +243,9 @@ export default function UserDashboard() {
     anchor.setDate(anchor.getDate() - 2);
 
     return rows.map((row) => {
-      const start = Math.max(0, diffInDays(anchor, row.due) - 2);
+      const start  = Math.max(0, diffInDays(anchor, row.due) - 2);
       const length = row.status === "done" ? 3 : row.status === "doing" ? 5 : 4;
-      return {
-        ...row,
-        start,
-        length,
-      };
+      return { ...row, start, length };
     });
   }, [tasks]);
 
@@ -265,18 +266,20 @@ export default function UserDashboard() {
           category: task.category,
           dueDate: task.dueDate,
           status: statusLabel[column],
-        })),
+        }))
       )
       .sort((a, b) => parseDueDate(a.dueDate).getTime() - parseDueDate(b.dueDate).getTime());
   }, [tasks]);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f5f6fa 0%, #eef0f8 50%, #f0eef8 100%)" }}>
-      {/* Nav */}
+      {/* Nav — kirim searchQuery & onSearchChange */}
       <NavBar
         onNewTask={() => openModal("todo")}
         activeView={activeView}
         onViewChange={setActiveView}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Board header */}
@@ -295,8 +298,8 @@ export default function UserDashboard() {
               {activeView === "board"
                 ? `${totalTasks} total tasks · ${completed} completed · ${inProgress} in progress · ${pending} pending`
                 : activeView === "timeline"
-                  ? `Visual timeline for ${totalTasks} tasks across all statuses`
-                  : `Unified history from To Do, Doing, and Done (${totalTasks} tasks)`}
+                ? `Visual timeline for ${totalTasks} tasks across all statuses`
+                : `Unified history from To Do, Doing, and Done (${totalTasks} tasks)`}
             </p>
           </div>
 
@@ -319,16 +322,14 @@ export default function UserDashboard() {
               </button>
             </div>
 
-            {/* TOMBOL LOGOUT MERAH */}
-            <button 
+            <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-600 font-bold hover:bg-red-50 transition-colors" 
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-600 font-bold hover:bg-red-50 transition-colors"
               style={{ border: "1px solid rgba(239, 68, 68, 0.2)", background: "white" }}
             >
               <LogOut size={16} />
               <span className="hidden sm:inline">Logout</span>
             </button>
-
           </div>
         </div>
       </div>
@@ -351,6 +352,7 @@ export default function UserDashboard() {
         </div>
       </div>
 
+      {/* Board view — pakai filteredTasks supaya search bekerja */}
       {activeView === "board" && (
         <div className="flex-1 px-6 pb-8">
           <DndProvider backend={HTML5Backend}>
@@ -359,7 +361,7 @@ export default function UserDashboard() {
                 <KanbanColumn
                   key={col}
                   type={col}
-                  tasks={tasks[col]}
+                  tasks={filteredTasks[col]}
                   onAddTask={openModal}
                   onMoveTask={handleMoveTask}
                 />
@@ -369,6 +371,7 @@ export default function UserDashboard() {
         </div>
       )}
 
+      {/* Timeline view — tidak berubah sama sekali */}
       {activeView === "timeline" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 p-5" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
@@ -394,8 +397,8 @@ export default function UserDashboard() {
                           item.status === "done"
                             ? "linear-gradient(135deg, #10b981, #059669)"
                             : item.status === "doing"
-                              ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                              : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                            ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                            : "linear-gradient(135deg, #6366f1, #4f46e5)",
                       }}
                     >
                       {item.priority}
@@ -408,6 +411,7 @@ export default function UserDashboard() {
         </div>
       )}
 
+      {/* Reports view — tidak berubah sama sekali */}
       {activeView === "reports" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
@@ -445,7 +449,6 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* New Task Modal */}
       <NewTaskModal
         open={modalOpen}
         defaultColumn={defaultColumn}
