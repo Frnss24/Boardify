@@ -10,11 +10,9 @@ import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { Task } from "../components/TaskCard";
 
-// impor buat fungsi Logout
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 
-// Data dummy 
 const initialTasks: Record<ColumnType, Task[]> = {
   todo: [
     {
@@ -144,21 +142,41 @@ const initialTasks: Record<ColumnType, Task[]> = {
 const totalTasks = Object.values(initialTasks).reduce((acc, col) => acc + col.length, 0);
 
 export default function UserDashboard() {
-  const router = useRouter(); // <-- Siapin router buat pindah halaman
+  const router = useRouter();
   const [tasks, setTasks] = useState<Record<ColumnType, Task[]>>(initialTasks);
   const [modalOpen, setModalOpen] = useState(false);
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
   const [viewMode] = useState<"grid" | "list">("grid");
+
+  // ── SEARCH STATE ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter tasks di semua kolom berdasarkan searchQuery (ILIKE = includes case-insensitive)
+  const filterTasks = (list: Task[]) => {
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        (t.description ?? "").toLowerCase().includes(q)
+    );
+  };
+
+  const filteredTasks = {
+    todo:  filterTasks(tasks.todo),
+    doing: filterTasks(tasks.doing),
+    done:  filterTasks(tasks.done),
+  };
+  // ─────────────────────────────────────────────────────────────
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // fungsi logout user
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push("/login");
     router.refresh();
   };
 
@@ -188,14 +206,18 @@ export default function UserDashboard() {
     });
   }, []);
 
-  const completed = tasks.done.length;
+  const completed  = tasks.done.length;
   const inProgress = tasks.doing.length;
-  const pending = tasks.todo.length;
+  const pending    = tasks.todo.length;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f5f6fa 0%, #eef0f8 50%, #f0eef8 100%)" }}>
-      {/* Nav */}
-      <NavBar onNewTask={() => openModal("todo")} />
+      {/* Nav — kirim searchQuery & onSearchChange */}
+      <NavBar
+        onNewTask={() => openModal("todo")}
+        searchQuery={searchQuery}
+        onSearchChange={(v) => setSearchQuery(v)}
+      />
 
       {/* Board header */}
       <div className="px-6 pt-6 pb-4">
@@ -214,12 +236,11 @@ export default function UserDashboard() {
 
           {/* Toolbar & Logout */}
           <div className="flex items-center gap-2">
-            {/* Stats pills */}
             <div className="hidden md:flex items-center gap-2 mr-2">
               {[
-                { label: "Pending", count: pending, color: "#6366f1", bg: "#eef2ff" },
-                { label: "Active", count: inProgress, color: "#f59e0b", bg: "#fffbeb" },
-                { label: "Done", count: completed, color: "#10b981", bg: "#f0fdf4" },
+                { label: "Pending", count: pending,    color: "#6366f1", bg: "#eef2ff" },
+                { label: "Active",  count: inProgress, color: "#f59e0b", bg: "#fffbeb" },
+                { label: "Done",    count: completed,  color: "#10b981", bg: "#f0fdf4" },
               ].map((stat) => (
                 <div
                   key={stat.label}
@@ -249,16 +270,14 @@ export default function UserDashboard() {
               </button>
             </div>
 
-            {/* TOMBOL LOGOUT MERAH */}
-            <button 
+            <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-600 font-bold hover:bg-red-50 transition-colors" 
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-600 font-bold hover:bg-red-50 transition-colors"
               style={{ border: "1px solid rgba(239, 68, 68, 0.2)", background: "white" }}
             >
               <LogOut size={16} />
               <span className="hidden sm:inline">Logout</span>
             </button>
-
           </div>
         </div>
       </div>
@@ -281,7 +300,7 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Kanban board */}
+      {/* Kanban board — pakai filteredTasks bukan tasks */}
       <div className="flex-1 px-6 pb-8">
         <DndProvider backend={HTML5Backend}>
           <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
@@ -289,7 +308,7 @@ export default function UserDashboard() {
               <KanbanColumn
                 key={col}
                 type={col}
-                tasks={tasks[col]}
+                tasks={filteredTasks[col]}
                 onAddTask={openModal}
                 onMoveTask={handleMoveTask}
               />
@@ -298,7 +317,6 @@ export default function UserDashboard() {
         </DndProvider>
       </div>
 
-      {/* New Task Modal */}
       <NewTaskModal
         open={modalOpen}
         defaultColumn={defaultColumn}

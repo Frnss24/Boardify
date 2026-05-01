@@ -3,11 +3,15 @@ import Image from "next/image";
 import { Search, Bell, Plus, ChevronDown } from "lucide-react";
 import boardifyLogo from "../../../asset/Boardify.png";
 
+// ── TAMBAH 2 props baru ───────────────────────────────────────
 interface NavBarProps {
   onNewTask: () => void;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
 }
+// ─────────────────────────────────────────────────────────────
 
-export function NavBar({ onNewTask }: NavBarProps) {
+export function NavBar({ onNewTask, searchQuery, onSearchChange }: NavBarProps) {
   const [searchFocused, setSearchFocused] = useState(false);
 
   return (
@@ -37,6 +41,8 @@ export function NavBar({ onNewTask }: NavBarProps) {
         <input
           type="text"
           placeholder="Search tasks..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
           className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none transition-all duration-200"
