@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react"; 
-import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History, KanbanSquare } from "lucide-react"; 
+import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History } from "lucide-react"; 
 import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
@@ -142,18 +142,8 @@ const initialTasks: Record<ColumnType, Task[]> = {
 const totalTasks = Object.values(initialTasks).reduce((acc, col) => acc + col.length, 0);
 
 const monthMap: Record<string, number> = {
-  Jan: 0,
-  Feb: 1,
-  Mar: 2,
-  Apr: 3,
-  May: 4,
-  Jun: 5,
-  Jul: 6,
-  Aug: 7,
-  Sep: 8,
-  Oct: 9,
-  Nov: 10,
-  Dec: 11,
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
 };
 
 function parseDueDate(label: string): Date {
@@ -176,10 +166,9 @@ export default function UserDashboard() {
   const [activeView, setActiveView] = useState<UserView>("board");
   const [viewMode] = useState<"grid" | "list">("grid");
 
-  // ── SEARCH STATE ──────────────────────────────────────────────
+  // ── SEARCH STATE (fitur tugasmu) ──────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter tasks di semua kolom berdasarkan searchQuery (ILIKE = includes case-insensitive)
   const filterTasks = (list: Task[]) => {
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
@@ -203,11 +192,9 @@ export default function UserDashboard() {
   );
 
   const handleLogout = async () => {
-    // Hapus cookie demo auth
     document.cookie = 'boardify_demo_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    
     await supabase.auth.signOut();
-    router.push("/login");
+    router.push('/login');
     router.refresh();
   };
 
@@ -239,7 +226,7 @@ export default function UserDashboard() {
 
   const completed  = tasks.done.length;
   const inProgress = tasks.doing.length;
-  const pending = tasks.todo.length;
+  const pending    = tasks.todo.length;
 
   const timelineRows = useMemo(() => {
     const rows = (["todo", "doing", "done"] as ColumnType[])
@@ -248,7 +235,7 @@ export default function UserDashboard() {
           ...task,
           status: column,
           due: parseDueDate(task.dueDate),
-        })),
+        }))
       )
       .sort((a, b) => a.due.getTime() - b.due.getTime());
 
@@ -256,13 +243,9 @@ export default function UserDashboard() {
     anchor.setDate(anchor.getDate() - 2);
 
     return rows.map((row) => {
-      const start = Math.max(0, diffInDays(anchor, row.due) - 2);
+      const start  = Math.max(0, diffInDays(anchor, row.due) - 2);
       const length = row.status === "done" ? 3 : row.status === "doing" ? 5 : 4;
-      return {
-        ...row,
-        start,
-        length,
-      };
+      return { ...row, start, length };
     });
   }, [tasks]);
 
@@ -283,25 +266,20 @@ export default function UserDashboard() {
           category: task.category,
           dueDate: task.dueDate,
           status: statusLabel[column],
-        })),
+        }))
       )
       .sort((a, b) => parseDueDate(a.dueDate).getTime() - parseDueDate(b.dueDate).getTime());
   }, [tasks]);
-  const pending    = tasks.todo.length;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f5f6fa 0%, #eef0f8 50%, #f0eef8 100%)" }}>
-      {/* Nav */}
+      {/* Nav — kirim searchQuery & onSearchChange */}
       <NavBar
         onNewTask={() => openModal("todo")}
         activeView={activeView}
         onViewChange={setActiveView}
-      />
-      {/* Nav — kirim searchQuery & onSearchChange */}
-      <NavBar
-        onNewTask={() => openModal("todo")}
         searchQuery={searchQuery}
-        onSearchChange={(v) => setSearchQuery(v)}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Board header */}
@@ -320,30 +298,13 @@ export default function UserDashboard() {
               {activeView === "board"
                 ? `${totalTasks} total tasks · ${completed} completed · ${inProgress} in progress · ${pending} pending`
                 : activeView === "timeline"
-                  ? `Visual timeline for ${totalTasks} tasks across all statuses`
-                  : `Unified history from To Do, Doing, and Done (${totalTasks} tasks)`}
+                ? `Visual timeline for ${totalTasks} tasks across all statuses`
+                : `Unified history from To Do, Doing, and Done (${totalTasks} tasks)`}
             </p>
           </div>
 
           {/* Toolbar & Logout */}
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-2 mr-2">
-              {[
-                { label: "Pending", count: pending,    color: "#6366f1", bg: "#eef2ff" },
-                { label: "Active",  count: inProgress, color: "#f59e0b", bg: "#fffbeb" },
-                { label: "Done",    count: completed,  color: "#10b981", bg: "#f0fdf4" },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs"
-                  style={{ background: stat.bg, color: stat.color, fontWeight: 600 }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: stat.color }} />
-                  {stat.count} {stat.label}
-                </div>
-              ))}
-            </div>
-
             <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
               <Filter size={14} />
               <span className="hidden sm:inline">Filter</span>
@@ -391,6 +352,7 @@ export default function UserDashboard() {
         </div>
       </div>
 
+      {/* Board view — pakai filteredTasks supaya search bekerja */}
       {activeView === "board" && (
         <div className="flex-1 px-6 pb-8">
           <DndProvider backend={HTML5Backend}>
@@ -399,7 +361,7 @@ export default function UserDashboard() {
                 <KanbanColumn
                   key={col}
                   type={col}
-                  tasks={tasks[col]}
+                  tasks={filteredTasks[col]}
                   onAddTask={openModal}
                   onMoveTask={handleMoveTask}
                 />
@@ -409,6 +371,7 @@ export default function UserDashboard() {
         </div>
       )}
 
+      {/* Timeline view — tidak berubah sama sekali */}
       {activeView === "timeline" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 p-5" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
@@ -434,8 +397,8 @@ export default function UserDashboard() {
                           item.status === "done"
                             ? "linear-gradient(135deg, #10b981, #059669)"
                             : item.status === "doing"
-                              ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                              : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                            ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                            : "linear-gradient(135deg, #6366f1, #4f46e5)",
                       }}
                     >
                       {item.priority}
@@ -448,6 +411,7 @@ export default function UserDashboard() {
         </div>
       )}
 
+      {/* Reports view — tidak berubah sama sekali */}
       {activeView === "reports" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
@@ -484,22 +448,6 @@ export default function UserDashboard() {
           </div>
         </div>
       )}
-      {/* Kanban board — pakai filteredTasks bukan tasks */}
-      <div className="flex-1 px-6 pb-8">
-        <DndProvider backend={HTML5Backend}>
-          <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
-            {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
-              <KanbanColumn
-                key={col}
-                type={col}
-                tasks={filteredTasks[col]}
-                onAddTask={openModal}
-                onMoveTask={handleMoveTask}
-              />
-            ))}
-          </div>
-        </DndProvider>
-      </div>
 
       <NewTaskModal
         open={modalOpen}
