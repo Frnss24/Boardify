@@ -22,9 +22,6 @@ export default function DashboardPage() {
 
   // function logout
   const handleLogout = async () => {
-    // Hapus cookie demo auth
-    document.cookie = 'boardify_demo_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    
     await supabase.auth.signOut();
     
     router.push('/login');

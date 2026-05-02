@@ -1,31 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-type DemoAuth = {
-  role: 'admin' | 'user';
-  email: string;
-};
-
-function getDemoAuth(request: NextRequest): DemoAuth | null {
-  const raw = request.cookies.get('boardify_demo_auth')?.value;
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(decodeURIComponent(raw)) as Partial<DemoAuth>;
-
-    if ((parsed.role === 'admin' || parsed.role === 'user') && typeof parsed.email === 'string') {
-      return { role: parsed.role, email: parsed.email };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -59,53 +34,45 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // get session
+  // get session dari Supabase
   const { data: { session } } = await supabase.auth.getSession();
-  const demoAuth = getDemoAuth(request);
 
   const path = request.nextUrl.pathname;
 
-  const activeRole = session
-    ? undefined
-    : demoAuth?.role;
-
-  // auto ke lgoin
+  // auto ke login
   if (path === '/') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // proteksi hal kalo belom login
-  if (!session && !demoAuth && (path.startsWith('/user') || path.startsWith('/admin'))) {
-    // mau masuk tp belum login
+  // proteksi halaman kalo belom login
+  if (!session && (path.startsWith('/user') || path.startsWith('/admin'))) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // cek role untuk session Supabase atau akun demo lokal
-  if (session || demoAuth) {
-    const userRole = session
-      ? (await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()).data?.role
-      : activeRole;
+  // kalo sudah login
+  if (session) {
+    // Ambil role dari tabel profiles
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
 
-    // Ambil data role dari tabel profiles
-    // kalo dah login tapi mau buka halaman login lagi, lempar balik ke halaman masing-masing
+    const userRole = profile?.role || 'user';
+
+    // kalo dah login tapi mau buka halaman login lagi, lempar balik
     if (path.startsWith('/login')) {
-      if (userRole === 'admin') {
-        return NextResponse.redirect(new URL('/admin', request.url));
-      } else if (userRole === 'user') {
-        return NextResponse.redirect(new URL('/user', request.url));
-      }
+      return NextResponse.redirect(
+        new URL(userRole === 'admin' ? '/admin' : '/user', request.url)
+      );
     }
 
-    // /user gbs ke /admin
+    // /admin hanya bisa diakses admin
     if (path.startsWith('/admin') && userRole !== 'admin') {
       return NextResponse.redirect(new URL('/user', request.url));
     }
 
-    // /admin gbs ke /user
+    // /user hanya bisa diakses user
     if (path.startsWith('/user') && userRole !== 'user') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }

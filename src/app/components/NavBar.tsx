@@ -45,23 +45,6 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
 
   useEffect(() => {
     async function fetchUser() {
-      const getDemoAuth = () => {
-        const match = document.cookie.match(new RegExp('(^| )boardify_demo_auth=([^;]+)'));
-        if (match) {
-          try { return JSON.parse(decodeURIComponent(match[2])); }
-          catch (e) { return null; }
-        }
-        return null;
-      };
-
-      const demoAuth = getDemoAuth();
-      if (demoAuth) {
-        setUserName(demoAuth.role === 'admin' ? "Demo Admin" : "Demo User");
-        setUserEmail(demoAuth.email);
-        setUserInitials(demoAuth.role === 'admin' ? "DA" : "DU");
-        return;
-      }
-
       try {
         const supabase = createBrowserClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,7 +84,6 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
   }, []);
 
   const handleLogout = async () => {
-    document.cookie = 'boardify_demo_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

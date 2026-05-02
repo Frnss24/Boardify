@@ -50,38 +50,44 @@ export default function RegisterPage() {
 
     setIsLoading(true);
 
-    //daftarin ke supabase auth
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-    });
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          role: 'user',
+        }),
+      });
 
-    if (signUpError) {
-      setError(signUpError.message); 
-      setIsLoading(false);
-      return;
-    }
+      const data = await response.json();
 
-    // masuk ke tabel profiles
-    if (authData.user) {
-      const { error: profileError } = await supabase.from('profiles').insert([
-        {
-          id: authData.user.id,
-          name: fullName,
-          email: email,
-          role: 'user' 
-        }
-      ]);
-
-      if (profileError) {
-        setError('Akun berhasil dibuat, tapi gagal mwnyimpan profil!');
-        setIsLoading(false);
+      if (!response.ok) {
+        setError(data.error || 'Sign up gagal');
         return;
       }
-    }
 
-    // kalau sukses, arahin langsung ke halaman User Dashboard
-    router.push('/user');
+      // Update profile dengan full name
+      if (data.user) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ name: fullName })
+          .eq('id', data.user.id);
+
+        if (updateError) {
+          console.error('Failed to update profile:', updateError);
+        }
+      }
+
+      // Redirect ke user dashboard
+      router.push('/user');
+    } catch (err) {
+      setError('Terjadi kesalahan. Coba lagi.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
