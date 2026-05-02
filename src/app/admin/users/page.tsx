@@ -1,11 +1,7 @@
 // src/app/admin/users/page.tsx
 import { MoreVertical, UserPlus, Mail } from 'lucide-react';
 
-const users = [
-  { id: 1, name: 'Alex Murphy', email: 'alex@boardify.com', role: 'Admin', status: 'Active' },
-  { id: 2, name: 'Sarah Koenig', email: 'sarah@boardify.com', role: 'Member', status: 'Active' },
-  { id: 3, name: 'Mike Torento', email: 'mike@boardify.com', role: 'Member', status: 'Inactive' },
-];
+const users: any[] = [];
 
 export default function UsersPage() {
   return (

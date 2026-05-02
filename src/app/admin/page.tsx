@@ -8,14 +8,8 @@ import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { hapusDataPermanen } from '../../lib/api';
 
-// Data sementara (Mock Data)
-const recentTasks = [
-  { id: 'BRD-01', title: 'Setup database schema', status: 'Done', priority: 'High', assignee: 'Alex M.', date: '2h ago' },
-  { id: 'BRD-02', title: 'Design landing page', status: 'In Progress', priority: 'Medium', assignee: 'Sarah K.', date: '5h ago' },
-  { id: 'BRD-03', title: 'Fix authentication bug', status: 'To Do', priority: 'High', assignee: 'Mike T.', date: '1d ago' },
-  { id: 'BRD-04', title: 'Update user profile UI', status: 'In Progress', priority: 'Low', assignee: 'Alex M.', date: '1d ago' },
-  { id: 'BRD-05', title: 'Write API documentation', status: 'To Do', priority: 'Medium', assignee: 'Sarah K.', date: '2d ago' },
-];
+// Data sementara 
+const recentTasks: any[] = [];
 
 export default function DashboardPage() {
   const router = useRouter();
