@@ -52,10 +52,11 @@ interface KanbanColumnProps {
   onAddTask: (column: ColumnType) => void;
   onMoveTask?: (taskId: string, from: ColumnType, to: ColumnType) => void;
   onDeleteTask?: (id: string) => void;
+  onDeleteTaskPermanently?: (id: string) => void;
   onEditTask?: (task: Task) => void;
 }
 
-export function KanbanColumn({ type, tasks, onAddTask, onMoveTask, onDeleteTask, onEditTask }: KanbanColumnProps) {
+export function KanbanColumn({ type, tasks, onAddTask, onMoveTask, onDeleteTask, onDeleteTaskPermanently, onEditTask }: KanbanColumnProps) {
   const config = columnConfigs[type];
 
   const handleDrop = useCallback((item: any) => {
@@ -125,6 +126,7 @@ export function KanbanColumn({ type, tasks, onAddTask, onMoveTask, onDeleteTask,
             index={index}
             column={type}
             onDelete={onDeleteTask}
+            onDeletePermanently={onDeleteTaskPermanently}
             onEdit={onEditTask}
             onMove={(id, to) => onMoveTask?.(id, type, to)}
           />

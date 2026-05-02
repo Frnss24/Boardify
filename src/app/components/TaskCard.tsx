@@ -47,11 +47,12 @@ interface TaskCardProps {
   index: number;
   column?: import("./KanbanColumn").ColumnType;
   onDelete?: (id: string) => void;
+  onDeletePermanently?: (id: string) => void;
   onEdit?: (task: Task) => void;
   onMove?: (id: string, to: import("./KanbanColumn").ColumnType) => void;
 }
 
-export function TaskCard({ task, index, column, onDelete, onEdit, onMove }: TaskCardProps) {
+export function TaskCard({ task, index, column, onDelete, onDeletePermanently, onEdit, onMove }: TaskCardProps) {
   const dragItem = useMemo(() => ({ id: task.id, from: column }), [task.id, column]);
 
   const [{ isDragging }, dragRef] = useDrag(() => ({
@@ -69,6 +70,7 @@ export function TaskCard({ task, index, column, onDelete, onEdit, onMove }: Task
     e.stopPropagation();
     setMenuOpen(false);
     if (item === "Delete") onDelete?.(task.id);
+    if (item === "Delete Permanently") onDeletePermanently?.(task.id);
     if (item === "Edit Task") onEdit?.(task);
     if (item === "Move To Doing") onMove?.(task.id, "doing");
     if (item === "Move To Done") onMove?.(task.id, "done");
@@ -77,10 +79,10 @@ export function TaskCard({ task, index, column, onDelete, onEdit, onMove }: Task
 
   const menuItems =
     column === "todo"
-      ? ["Edit Task", "Move To Doing", "Move To Done", "Delete"]
+      ? ["Edit Task", "Move To Doing", "Move To Done", "Delete", "Delete Permanently"]
       : column === "doing"
-      ? ["Edit Task", "Move To Todo", "Move To Done", "Delete"]
-      : ["Edit Task", "Move To Todo", "Move To Doing", "Delete"];
+      ? ["Edit Task", "Move To Todo", "Move To Done", "Delete", "Delete Permanently"]
+      : ["Edit Task", "Move To Todo", "Move To Doing", "Delete", "Delete Permanently"];
 
   return (
     <motion.div
@@ -141,7 +143,7 @@ export function TaskCard({ task, index, column, onDelete, onEdit, onMove }: Task
             <button
               key={item}
               className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
-              style={{ color: item === "Delete" ? "#ef4444" : "#374151" }}
+              style={{ color: item.includes("Delete") ? "#ef4444" : "#374151" }}
               onClick={(e) => handleMenuClick(e, item)}
             >
               {item}

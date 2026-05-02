@@ -33,7 +33,8 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">Workspace Name</label>
                 <input 
                   type="text" 
-                  defaultValue="Q2 Product Sprint" 
+                  defaultValue="" 
+                  placeholder="Workspace name"
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
                 />
               </div>
@@ -41,7 +42,8 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">Workspace Description</label>
                 <input 
                   type="text" 
-                  defaultValue="Main workspace for engineering team" 
+                  defaultValue="" 
+                  placeholder="Workspace description"
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
                 />
               </div>
@@ -98,6 +100,10 @@ export default function SettingsPage() {
                 <input type="checkbox" className="sr-only peer" />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
               </label>
+            </div>
+
+            <div className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+              No numeric preferences loaded yet.
             </div>
 
           </div>

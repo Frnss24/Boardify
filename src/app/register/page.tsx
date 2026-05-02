@@ -18,7 +18,6 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // inisialisasi supabase
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -61,7 +60,6 @@ export default function RegisterPage() {
             full_name: fullName.trim(),
             role: 'user',
           },
-          emailRedirectTo: `${window.location.origin}/login?confirmed=1`,
         },
       });
 
@@ -70,32 +68,11 @@ export default function RegisterPage() {
         return;
       }
 
-      if (data.session) {
-        const syncResponse = await fetch('/api/auth/sync-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: data.user.id,
-            email: data.user.email,
-            role: 'user',
-            name: fullName.trim(),
-          }),
-        });
-
-        if (!syncResponse.ok) {
-          const syncData = await syncResponse.json();
-          setError(syncData.error || 'Gagal menyimpan user ke tabel users');
-          return;
-        }
-
-        router.push('/user');
-        return;
-      }
-
-      setSuccessMessage('Akun berhasil dibuat. Cek email kamu untuk konfirmasi sebelum login.');
+      setSuccessMessage('Akun berhasil dibuat.');
       setFullName('');
       setEmail('');
       setPassword('');
+      router.push('/login');
     } catch (err) {
       setError('Terjadi kesalahan. Coba lagi.');
       console.error(err);

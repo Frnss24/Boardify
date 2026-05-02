@@ -12,9 +12,21 @@ export async function POST(req: Request) {
       );
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        {
+          error: 'SUPABASE_SERVICE_ROLE_KEY belum diset di .env.local. Sinkronisasi users tidak bisa dijalankan tanpa key itu.',
+        },
+        { status: 500 }
+      );
+    }
+
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      supabaseUrl,
+      serviceRoleKey
     );
 
     const { error } = await supabase

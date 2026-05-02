@@ -1,28 +1,68 @@
 "use client"; 
 
+import { useEffect, useState } from 'react';
 import { 
   Users, CheckCircle2, ListTodo, Search, Bell, 
   TrendingUp, TrendingDown, MoreHorizontal, Clock, LogOut 
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
-import { hapusDataPermanen } from '../../lib/api';
 
-// Data sementara 
-const recentTasks: any[] = [];
+type DashboardTask = {
+  id: string;
+  title: string;
+  status: string;
+  assignee_id: string | null;
+  created_at?: string | null;
+};
+
+type DashboardUser = {
+  id: string;
+  name: string | null;
+  email: string;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [recentTasks, setRecentTasks] = useState<DashboardTask[]>([]);
+  const [users, setUsers] = useState<DashboardUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // inisialisasi supabase buat jalanin fungsi Logout
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDashboardData() {
+      setIsLoading(true);
+
+      const response = await fetch('/api/admin/overview');
+      const data = await response.json();
+
+      if (!isMounted) return;
+
+      if (!response.ok) {
+        console.error('Failed to load admin overview:', data.error || response.statusText);
+        setRecentTasks([]);
+        setUsers([]);
+      } else {
+        setRecentTasks(data.tasks ?? []);
+        setUsers(data.users ?? []);
+      }
+
+      setIsLoading(false);
+    }
+
+    void loadDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // function logout
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    const response = await fetch('/api/auth/signout', { method: 'POST' });
+    if (!response.ok) {
+      console.error('Sign out failed');
+    }
     
     router.push('/login');
     
@@ -43,14 +83,6 @@ export default function DashboardPage() {
           <button className="p-2 bg-white border rounded-full text-gray-500 hover:text-blue-600 shadow-sm">
             <Bell size={20} />
           </button>
-          
-          {/* TOMBOL TESTING JOBDESK 12 */}
-          <button 
-            onClick={() => hapusDataPermanen(1)} 
-            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-full text-white font-medium transition-colors shadow-sm"
-          >
-            <span className="text-sm">Test Hapus ID 1</span>
-          </button>
 
           {/* TOMBOL LOGOUT BARU */}
           <button 
@@ -66,9 +98,9 @@ export default function DashboardPage() {
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Total Tasks', value: '1,248', icon: ListTodo, color: 'text-blue-600', bg: 'bg-blue-100', trend: '+12%', IconTrend: TrendingUp, trendColor: 'text-green-600 bg-green-50' },
-          { label: 'Completed', value: '892', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100', trend: '-2%', IconTrend: TrendingDown, trendColor: 'text-red-600 bg-red-50' },
-          { label: 'Active Users', value: '156', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', trend: '+18%', IconTrend: TrendingUp, trendColor: 'text-green-600 bg-green-50' },
+          { label: 'Total Tasks', value: recentTasks.length.toString(), icon: ListTodo, color: 'text-blue-600', bg: 'bg-blue-100', trend: '+', IconTrend: TrendingUp, trendColor: 'text-green-600 bg-green-50' },
+          { label: 'Completed', value: recentTasks.filter((task) => String(task.status).toLowerCase() === 'done').length.toString(), icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100', trend: '+', IconTrend: TrendingUp, trendColor: 'text-green-600 bg-green-50' },
+          { label: 'Active Users', value: users.length.toString(), icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', trend: '+', IconTrend: TrendingUp, trendColor: 'text-green-600 bg-green-50' },
         ].map((item, i) => (
           <div key={i} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between group hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
@@ -95,53 +127,50 @@ export default function DashboardPage() {
             <button className="text-sm text-blue-600 font-medium hover:text-blue-800">View All</button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-white border-b border-gray-100 text-sm text-gray-500">
-                  <th className="p-4 font-semibold">Task ID</th>
-                  <th className="p-4 font-semibold">Title</th>
-                  <th className="p-4 font-semibold">Status</th>
-                  <th className="p-4 font-semibold">Priority</th>
-                  <th className="p-4 font-semibold">Assignee</th>
-                  <th className="p-4 font-semibold"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {recentTasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="p-4 text-sm font-medium text-gray-900">{task.id}</td>
-                    <td className="p-4 text-sm text-gray-700 font-medium">{task.title}</td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${task.status === 'Done' ? 'bg-green-100 text-green-800' : 
-                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-gray-100 text-gray-800'}`}>
-                        {task.status}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
-                        ${task.priority === 'High' ? 'border-red-200 text-red-700 bg-red-50' : 
-                          task.priority === 'Medium' ? 'border-orange-200 text-orange-700 bg-orange-50' : 
-                          'border-blue-200 text-blue-700 bg-blue-50'}`}>
-                        {task.priority}
-                      </span>
-                    </td>
-                    <td className="p-4 text-sm text-gray-600 flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
-                        {task.assignee.charAt(0)}
-                      </div>
-                      {task.assignee}
-                    </td>
-                    <td className="p-4 text-right">
-                      <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal size={18} />
-                      </button>
-                    </td>
+            {isLoading ? (
+              <div className="p-6 text-sm text-gray-500">Loading task activity...</div>
+            ) : recentTasks.length === 0 ? (
+              <div className="p-6 text-sm text-gray-500">No recent task activity yet.</div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white border-b border-gray-100 text-sm text-gray-500">
+                    <th className="p-4 font-semibold">Task ID</th>
+                    <th className="p-4 font-semibold">Title</th>
+                    <th className="p-4 font-semibold">Status</th>
+                    <th className="p-4 font-semibold">Assignee</th>
+                    <th className="p-4 font-semibold"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {recentTasks.map((task) => (
+                    <tr key={task.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="p-4 text-sm font-medium text-gray-900">{task.id}</td>
+                      <td className="p-4 text-sm text-gray-700 font-medium">{task.title}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                          ${task.status === 'Done' ? 'bg-green-100 text-green-800' : 
+                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 
+                            'bg-gray-100 text-gray-800'}`}>
+                          {task.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm text-gray-600 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                          {task.assignee_id ? task.assignee_id.charAt(0) : '?'}
+                        </div>
+                        {task.assignee_id ?? 'Unassigned'}
+                      </td>
+                      <td className="p-4 text-right">
+                        <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -150,34 +179,8 @@ export default function DashboardPage() {
           <h3 className="text-lg font-bold text-gray-800 mb-6">Workload Distribution</h3>
           
           <div className="flex-1 flex flex-col gap-6">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-gray-700">Frontend Team</span>
-                <span className="text-gray-500">65%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full" style={{ width: '65%' }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-gray-700">Backend Team</span>
-                <span className="text-gray-500">40%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-purple-500 h-2 rounded-full" style={{ width: '40%' }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-gray-700">Design Team</span>
-                <span className="text-gray-500">85%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-red-500 h-2 rounded-full" style={{ width: '85%' }}></div>
-              </div>
+            <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+              {isLoading ? 'Loading workload data...' : 'Workload data is not mapped yet.'}
             </div>
           </div>
 

@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { email, password, role } = await req.json();
+    const { email, password, role, name } = await req.json();
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const normalizedName = typeof name === 'string' && name.trim() ? name.trim() : normalizedEmail.split('@')[0];
 
-    if (!email || !password || !role) {
+    if (!normalizedEmail || !password || !role) {
       return NextResponse.json(
         { error: 'Email, password, and role diperlukan' },
         { status: 400 }
@@ -19,17 +21,33 @@ export async function POST(req: Request) {
       );
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        {
+          error: 'SUPABASE_SERVICE_ROLE_KEY belum diset di .env.local. Tambahkan key service role lalu restart dev server.',
+        },
+        { status: 500 }
+      );
+    }
+
     // Gunakan service role key untuk create user
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      supabaseUrl,
+      serviceRoleKey
     );
 
     // Buat user di auth.users
     const { data, error } = await supabase.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
+      user_metadata: {
+        full_name: normalizedName,
+        role,
+      },
     });
 
     if (error || !data.user) {
@@ -42,17 +60,22 @@ export async function POST(req: Request) {
     // Insert ke tabel users
     const { error: userError } = await supabase
       .from('users')
-      .insert({
+      .upsert({
         id: data.user.id,
-        email,
+        email: normalizedEmail,
         role,
-        name: email.split('@')[0],
+        name: normalizedName,
+        password_hash: 'managed-by-supabase-auth',
         created_at: new Date().toISOString(),
-      });
+      }, { onConflict: 'id' });
 
     if (userError) {
       console.error('User record creation error:', userError);
-      // User udah di auth, jadi jangan return error
+      await supabase.auth.admin.deleteUser(data.user.id);
+      return NextResponse.json(
+        { error: userError.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -65,8 +88,9 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Signup error:', error);
+    const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json(
-      { error: 'Server error' },
+      { error: message },
       { status: 500 }
     );
   }

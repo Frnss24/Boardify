@@ -43,28 +43,13 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: userRecord, error: userError } = await supabase
+      const { data: userRecord } = await supabase
         .from('users')
         .select('role')
         .eq('id', data.user.id)
         .single();
 
       let resolvedRole = userRecord?.role || data.user.user_metadata?.role || 'user';
-
-      if (userError) {
-        void fetch('/api/auth/sync-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: data.user.id,
-            email: data.user.email,
-            role: resolvedRole,
-            name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-          }),
-        }).catch((syncError) => {
-          console.error('Sync user failed:', syncError);
-        });
-      }
 
       // Redirect berdasarkan role
       if (resolvedRole === 'admin') {
