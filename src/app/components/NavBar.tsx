@@ -53,14 +53,14 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUserEmail(session.user.email || "");
-          const { data: profile } = await supabase
-            .from('profiles')
+          const { data: user } = await supabase
+            .from('users')
             .select('name')
             .eq('id', session.user.id)
             .single();
-          if (profile?.name) {
-            setUserName(profile.name);
-            const names = profile.name.trim().split(' ');
+          if (user?.name) {
+            setUserName(user.name);
+            const names = user.name.trim().split(' ');
             const initials = names.length > 1
               ? `${names[0][0]}${names[names.length - 1][0]}`
               : names[0].substring(0, 2);

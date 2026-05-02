@@ -5,6 +5,7 @@ import { ChevronLeft, User, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'l
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import boardifyLogo from '../../../asset/Boardify.png'; 
 
 export default function LoginPage() {
@@ -27,24 +28,48 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: identifier.trim().toLowerCase(),
-          password,
-        }),
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: identifier.trim().toLowerCase(),
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Login gagal');
+      if (signInError || !data.session || !data.user) {
+        setError(signInError?.message || 'Login gagal');
         return;
       }
 
+      const { data: userRecord, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (userError) {
+        const syncResponse = await fetch('/api/auth/sync-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: data.user.id,
+            email: data.user.email,
+            role: data.user.user_metadata?.role || 'user',
+            name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+          }),
+        });
+
+        if (!syncResponse.ok) {
+          const syncData = await syncResponse.json();
+          setError(syncData.error || userError.message || 'Gagal membaca role user');
+          return;
+        }
+      }
+
       // Redirect berdasarkan role
-      if (data.user.role === 'admin') {
+      if (userRecord?.role === 'admin') {
         router.push('/admin');
       } else {
         router.push('/user');

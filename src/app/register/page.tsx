@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // inisialisasi supabase
   const supabase = createBrowserClient(
@@ -26,6 +27,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     // cek minimal 1 karakter spesial/unik
     const specialCharRegx = /[!@#$%^&*(),.?":{}|<>]/;
@@ -51,37 +53,49 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password,
-          role: 'user',
-        }),
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            role: 'user',
+          },
+          emailRedirectTo: `${window.location.origin}/login?confirmed=1`,
+        },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Sign up gagal');
+      if (signUpError || !data.user) {
+        setError(signUpError?.message || 'Sign up gagal');
         return;
       }
 
-      // Update profile dengan full name
-      if (data.user) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ name: fullName })
-          .eq('id', data.user.id);
+      if (data.session) {
+        const syncResponse = await fetch('/api/auth/sync-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: data.user.id,
+            email: data.user.email,
+            role: 'user',
+            name: fullName.trim(),
+          }),
+        });
 
-        if (updateError) {
-          console.error('Failed to update profile:', updateError);
+        if (!syncResponse.ok) {
+          const syncData = await syncResponse.json();
+          setError(syncData.error || 'Gagal menyimpan user ke tabel users');
+          return;
         }
+
+        router.push('/user');
+        return;
       }
 
-      // Redirect ke user dashboard
-      router.push('/user');
+      setSuccessMessage('Akun berhasil dibuat. Cek email kamu untuk konfirmasi sebelum login.');
+      setFullName('');
+      setEmail('');
+      setPassword('');
     } catch (err) {
       setError('Terjadi kesalahan. Coba lagi.');
       console.error(err);
@@ -127,6 +141,13 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            <div className={`overflow-hidden transition-all duration-300 ${successMessage ? 'max-h-24 mb-4' : 'max-h-0'}`}>
+              <div className="bg-emerald-500 text-white p-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-emerald-200">
+                <AlertCircle size={20} className="shrink-0" />
+                <p className="text-[11px] font-bold text-left leading-tight">{successMessage}</p>
+              </div>
+            </div>
+
             <form className="space-y-4 text-left" onSubmit={handleRegister} noValidate>
               {/* Nama Lengkap */}
               <div className="space-y-1">
@@ -137,7 +158,7 @@ export default function RegisterPage() {
                     type="text" 
                     placeholder="Masukkan nama lengkap"
                     value={fullName}
-                    onChange={(e) => { setFullName(e.target.value); setError(''); }}
+                    onChange={(e) => { setFullName(e.target.value); setError(''); setSuccessMessage(''); }}
                     className="w-full bg-white/30 border-2 border-white/50 rounded-full py-2.5 pl-12 pr-6 text-slate-800 outline-none focus:border-indigo-400 focus:bg-white transition-all placeholder:text-slate-500 text-sm"
                   />
                 </div>
@@ -152,7 +173,7 @@ export default function RegisterPage() {
                     type="email" 
                     placeholder="email@undip.ac.id"
                     value={email}
-                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); setSuccessMessage(''); }}
                     className="w-full bg-white/30 border-2 border-white/50 rounded-full py-2.5 pl-12 pr-6 text-slate-800 outline-none focus:border-indigo-400 focus:bg-white transition-all placeholder:text-slate-500 text-sm"
                   />
                 </div>
@@ -167,7 +188,7 @@ export default function RegisterPage() {
                     type={showPassword ? "text" : "password"} 
                     placeholder="8+ karakter & unik"
                     value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); setSuccessMessage(''); }}
                     className="w-full bg-white/30 border-2 border-white/40 rounded-full py-2.5 pl-12 pr-12 text-slate-800 outline-none focus:border-indigo-400 focus:bg-white transition-all placeholder:text-slate-500 text-sm"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600">

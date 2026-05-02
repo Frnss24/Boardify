@@ -29,9 +29,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ambil role dari profiles
-    const { data: profile } = await supabase
-      .from('profiles')
+    // Ambil role dari users table
+    const { data: user } = await supabase
+      .from('users')
       .select('role')
       .eq('id', data.user.id)
       .single();
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       user: {
         id: data.user.id,
         email: data.user.email,
-        role: profile?.role || 'user',
+        role: user?.role || 'user',
       },
     });
   } catch (error) {

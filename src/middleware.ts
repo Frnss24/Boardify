@@ -51,14 +51,14 @@ export async function middleware(request: NextRequest) {
 
   // kalo sudah login
   if (session) {
-    // Ambil role dari tabel profiles
-    const { data: profile } = await supabase
-      .from('profiles')
+    // Ambil role dari tabel users
+    const { data: user } = await supabase
+      .from('users')
       .select('role')
       .eq('id', session.user.id)
       .single();
 
-    const userRole = profile?.role || 'user';
+    const userRole = user?.role || 'user';
 
     // kalo dah login tapi mau buka halaman login lagi, lempar balik
     if (path.startsWith('/login')) {

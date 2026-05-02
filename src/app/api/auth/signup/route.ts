@@ -39,18 +39,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // Insert ke tabel profiles
-    const { error: profileError } = await supabase
-      .from('profiles')
+    // Insert ke tabel users
+    const { error: userError } = await supabase
+      .from('users')
       .insert({
         id: data.user.id,
         email,
         role,
+        name: email.split('@')[0],
         created_at: new Date().toISOString(),
       });
 
-    if (profileError) {
-      console.error('Profile creation error:', profileError);
+    if (userError) {
+      console.error('User record creation error:', userError);
       // User udah di auth, jadi jangan return error
     }
 
