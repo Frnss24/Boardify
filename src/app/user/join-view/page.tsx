@@ -28,22 +28,10 @@ export default function JoinViewPage() {
           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
 
-        // Query dengan JOIN: tasks → boards + users
+        // Ambil data dari VIEW Supabase yang sudah berisi hasil JOIN
         const { data, error: err } = await supabase
-          .from("tasks")
-          .select(
-            `
-            id,
-            title,
-            description,
-            status,
-            due_date,
-            board_id,
-            assignee_id,
-            boards(id, name),
-            users(id, name)
-          `
-          )
+          .from("task_join_view")
+          .select("*")
           .order("due_date", { ascending: true });
 
         if (err) {
@@ -52,18 +40,19 @@ export default function JoinViewPage() {
           return;
         }
 
-        // Transform data supaya sesuai interface
-        const transformed = data?.map((row: any) => ({
-          id: row.id,
-          title: row.title,
-          description: row.description,
-          status: row.status,
-          due_date: row.due_date || "-",
-          board_id: row.boards?.id || "-",
-          board_name: row.boards?.name || "No Board",
-          assignee_id: row.users?.id || "-",
-          assignee_name: row.users?.name || "Unassigned",
-        })) || [];
+        // Sesuaikan field dengan kolom yang ada di view
+        const transformed =
+          data?.map((row: any) => ({
+            id: row.task_id,
+            title: row.task_title,
+            description: row.task_description,
+            status: row.task_status,
+            due_date: row.due_date || "-",
+            board_id: row.board_id || "-",
+            board_name: row.board_name || "No Board",
+            assignee_id: row.assignee_id || "-",
+            assignee_name: row.assignee_name || "Unassigned",
+          })) || [];
 
         setTasks(transformed);
         setLoading(false);
@@ -98,7 +87,7 @@ export default function JoinViewPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-800">Task Join View</h1>
-          <p className="text-gray-500 mt-2">Query JOIN dari tabel tasks → boards + users</p>
+          <p className="text-gray-500 mt-2">Data diambil dari view Supabase: task_join_view</p>
         </div>
 
         {/* Table */}
