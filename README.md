@@ -14,3 +14,4 @@
   Run `npm run start` to run the production server.
   
   * malvin bima santiko (21120124130047) - backend login register dan session
+  * muhammad fathi bintang amrullah (21120124130060) - membuat rls di supabase, menentukan aktor, dan menghapus data dummy
