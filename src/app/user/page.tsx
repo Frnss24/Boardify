@@ -364,6 +364,16 @@ export default function UserDashboard() {
                   tasks={filteredTasks[col]}
                   onAddTask={openModal}
                   onMoveTask={handleMoveTask}
+                  onDeleteTask={(id) => {
+                    setTasks((prev) => ({
+                      todo: prev.todo.filter((t) => t.id !== id),
+                      doing: prev.doing.filter((t) => t.id !== id),
+                      done: prev.done.filter((t) => t.id !== id),
+                    }));
+                  }}
+                  onEditTask={(task) => {
+                    console.log("Edit task:", task);
+                  }}
                 />
               ))}
             </div>

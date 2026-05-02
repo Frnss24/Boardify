@@ -46,11 +46,14 @@ interface TaskCardProps {
   task: Task;
   index: number;
   column?: import("./KanbanColumn").ColumnType;
+  onDelete?: (id: string) => void;
+  onEdit?: (task: Task) => void;
+  onMove?: (id: string, to: import("./KanbanColumn").ColumnType) => void;
 }
 
-export function TaskCard({ task, index, column }: TaskCardProps) {
+export function TaskCard({ task, index, column, onDelete, onEdit, onMove }: TaskCardProps) {
   const dragItem = useMemo(() => ({ id: task.id, from: column }), [task.id, column]);
-  
+
   const [{ isDragging }, dragRef] = useDrag(() => ({
     type: "TASK",
     item: dragItem,
@@ -61,6 +64,23 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const priority = priorityConfig[task.priority];
   const category = categoryConfig[task.category];
+
+  const handleMenuClick = (e: React.MouseEvent, item: string) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    if (item === "Delete") onDelete?.(task.id);
+    if (item === "Edit Task") onEdit?.(task);
+    if (item === "Move To Doing") onMove?.(task.id, "doing");
+    if (item === "Move To Done") onMove?.(task.id, "done");
+    if (item === "Move To Todo") onMove?.(task.id, "todo");
+  };
+
+  const menuItems =
+    column === "todo"
+      ? ["Edit Task", "Move To Doing", "Move To Done", "Delete"]
+      : column === "doing"
+      ? ["Edit Task", "Move To Todo", "Move To Done", "Delete"]
+      : ["Edit Task", "Move To Todo", "Move To Doing", "Delete"];
 
   return (
     <motion.div
@@ -80,7 +100,7 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
         border: hovered ? "1px solid rgba(99,102,241,0.12)" : "1px solid rgba(0,0,0,0.05)",
       }}
     >
-      {/* Top row: category + priority + menu */}
+      {/* Top row */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span
@@ -117,12 +137,12 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
           className="absolute right-4 top-10 bg-white rounded-xl py-1 z-20 min-w-[140px]"
           style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.12)", border: "1px solid rgba(0,0,0,0.07)" }}
         >
-          {["Edit Task", "Move To Doing", "Move To Done", "Delete"].map((item) => (
+          {menuItems.map((item) => (
             <button
               key={item}
               className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
               style={{ color: item === "Delete" ? "#ef4444" : "#374151" }}
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+              onClick={(e) => handleMenuClick(e, item)}
             >
               {item}
             </button>
@@ -140,7 +160,7 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
         {task.description}
       </p>
 
-      {/* Progress bar (if exists) */}
+      {/* Progress bar */}
       {task.progress !== undefined && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
@@ -150,10 +170,7 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${task.progress}%`,
-                background: "linear-gradient(90deg, #6366f1, #8b5cf6)",
-              }}
+              style={{ width: `${task.progress}%`, background: "linear-gradient(90deg, #6366f1, #8b5cf6)" }}
             />
           </div>
         </div>
@@ -161,7 +178,6 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
 
       {/* Bottom row */}
       <div className="flex items-center justify-between">
-        {/* Assignee avatars */}
         <div className="flex items-center -space-x-2">
           {task.assignees.map((assignee, i) => (
             <div
@@ -174,8 +190,6 @@ export function TaskCard({ task, index, column }: TaskCardProps) {
             </div>
           ))}
         </div>
-
-        {/* Meta info */}
         <div className="flex items-center gap-3">
           {task.dueDate && (
             <span className="flex items-center gap-1 text-xs text-gray-400">
