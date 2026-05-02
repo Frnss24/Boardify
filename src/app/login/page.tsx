@@ -49,27 +49,25 @@ export default function LoginPage() {
         .eq('id', data.user.id)
         .single();
 
+      let resolvedRole = userRecord?.role || data.user.user_metadata?.role || 'user';
+
       if (userError) {
-        const syncResponse = await fetch('/api/auth/sync-user', {
+        void fetch('/api/auth/sync-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: data.user.id,
             email: data.user.email,
-            role: data.user.user_metadata?.role || 'user',
+            role: resolvedRole,
             name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
           }),
+        }).catch((syncError) => {
+          console.error('Sync user failed:', syncError);
         });
-
-        if (!syncResponse.ok) {
-          const syncData = await syncResponse.json();
-          setError(syncData.error || userError.message || 'Gagal membaca role user');
-          return;
-        }
       }
 
       // Redirect berdasarkan role
-      if (userRecord?.role === 'admin') {
+      if (resolvedRole === 'admin') {
         router.push('/admin');
       } else {
         router.push('/user');
