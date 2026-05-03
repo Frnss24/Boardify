@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Design Kanban Board App",
-  description: "A modern kanban board interface built with Next.js",
+  title: "Boardify",
+  description: "Boardify kanban workspace",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
