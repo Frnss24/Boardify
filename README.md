@@ -1,17 +1,13 @@
+*Boardify*
+Kanban Board untuk kebutuhan produktivitas
 
-  # Design Kanban Board App (Boardify)
+Orang- orang dibalik layar:
 
-  This is a code bundle for Design Kanban Board App. The original project is available at https://www.figma.com/design/spMhcFtJhRaZzORdcMuE3O/Design-Kanban-Board-App.
-
-  ## Running the code
-
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the Next.js development server.
-
-  Run `npm run build` to create a production build.
-
-  Run `npm run start` to run the production server.
-  
-  * malvin bima santiko (21120124130047) - backend login register dan session
-  * muhammad fathi bintang amrullah (21120124130060) - membuat rls di supabase, menentukan aktor, dan menghapus data dummy
+1.FRANSISKUS F. SINAGA
+2.VENNANDA AZ ZAHRA PUTRI
+3.MALVIN BIMA SANTIKO
+4.MUHAMMAD FATHI BINTANG AMRULLAH
+5.REVO RISKY PRATAMA
+6.DENOK INTAN PERMATA SARI
+7.MUHAMMAD ILHAM
+8.FADHLAN YUQA TAHTADIKA
