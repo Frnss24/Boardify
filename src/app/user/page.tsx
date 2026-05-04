@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { motion } from "motion/react"; 
-import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History } from "lucide-react"; 
+import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, History, MessageSquareWarning, X } from "lucide-react"; 
 import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
@@ -46,8 +46,14 @@ export default function UserDashboard() {
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("My Board");
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
 
   // ── SEARCH STATE (fitur tugasmu) ──────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -149,6 +155,7 @@ export default function UserDashboard() {
         }
 
         setUserId(sessionUser.id);
+        setUserEmail(sessionUser.email || "");
 
         const { data: boardsData, error: boardsError } = await supabase
           .from('boards')
@@ -233,6 +240,44 @@ export default function UserDashboard() {
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
+  };
+
+  const handleSubmitReport = async () => {
+    if (!userId || !userEmail) {
+      setReportFeedback("User session tidak valid. Coba login ulang.");
+      return;
+    }
+
+    if (!reportTitle.trim() || !reportMessage.trim()) {
+      setReportFeedback("Judul dan isi report wajib diisi.");
+      return;
+    }
+
+    setReportSubmitting(true);
+    setReportFeedback(null);
+
+    const response = await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reporter_id: userId,
+        reporter_email: userEmail,
+        title: reportTitle.trim(),
+        message: reportMessage.trim(),
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      setReportFeedback(payload.error || 'Gagal mengirim report. Coba lagi.');
+      setReportSubmitting(false);
+      return;
+    }
+
+    setReportFeedback('Report berhasil dikirim ke admin.');
+    setReportSubmitting(false);
+    setReportTitle('');
+    setReportMessage('');
   };
 
   const openModal = useCallback((column: ColumnType = "todo") => {
@@ -401,6 +446,18 @@ export default function UserDashboard() {
             >
               <LogOut size={16} />
               <span className="hidden sm:inline">Logout</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setReportOpen(true);
+                setReportFeedback(null);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-amber-700 font-bold hover:bg-amber-50 transition-colors"
+              style={{ border: "1px solid rgba(217, 119, 6, 0.25)", background: "white" }}
+            >
+              <MessageSquareWarning size={16} />
+              <span className="hidden sm:inline">Report</span>
             </button>
           </div>
         </div>
@@ -574,6 +631,64 @@ export default function UserDashboard() {
         onClose={() => setModalOpen(false)}
         onAdd={handleAddTask}
       />
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/30">
+          <div className="w-full max-w-xl rounded-2xl bg-white border border-gray-100 shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Submit Report</h2>
+              <button
+                onClick={() => setReportOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Title</label>
+                <input
+                  value={reportTitle}
+                  onChange={(event) => setReportTitle(event.target.value)}
+                  placeholder="Contoh: Task assignment bermasalah"
+                  className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Details</label>
+                <textarea
+                  value={reportMessage}
+                  onChange={(event) => setReportMessage(event.target.value)}
+                  placeholder="Jelaskan issue atau complaint kamu"
+                  className="w-full border rounded-lg px-3 py-2 text-sm min-h-[140px] outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+              {reportFeedback && (
+                <p className={`text-sm ${reportFeedback.toLowerCase().includes('berhasil') ? 'text-green-600' : 'text-red-600'}`}>
+                  {reportFeedback}
+                </p>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setReportOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm text-gray-700 bg-gray-100 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleSubmitReport()}
+                disabled={reportSubmitting}
+                className="px-4 py-2 rounded-lg text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
+              >
+                {reportSubmitting ? 'Sending...' : 'Send Report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

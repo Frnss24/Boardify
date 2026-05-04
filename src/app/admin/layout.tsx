@@ -1,5 +1,5 @@
 // src/app/admin/layout.tsx
-import { LayoutDashboard, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, Users } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import boardifyLogo from '../../../asset/Boardify.png';
@@ -45,14 +45,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Users size={20} className="group-hover:scale-110 transition-transform" />
             <span className="font-medium">Users</span>
-          </Link>
-          
-          <Link 
-            href="/admin/settings" 
-            className="flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all duration-200 group"
-          >
-            <Settings size={20} className="group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Settings</span>
           </Link>
         </nav>
 
