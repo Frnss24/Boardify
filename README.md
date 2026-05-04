@@ -1,13 +1,13 @@
-*Boardify*
+# Boardify
 Kanban Board untuk kebutuhan produktivitas
 
-Orang- orang dibalik layar:
+## Orang-orang dibalik layar:
 
-1.FRANSISKUS F. SINAGA
-2.VENNANDA AZ ZAHRA PUTRI
-3.MALVIN BIMA SANTIKO
-4.MUHAMMAD FATHI BINTANG AMRULLAH
-5.REVO RISKY PRATAMA
-6.DENOK INTAN PERMATA SARI
-7.MUHAMMAD ILHAM
-8.FADHLAN YUQA TAHTADIKA
+1. Fransiskus F. Sinaga  
+2. Vennanda Az Zahra Putri  
+3. Malvin Bima Santiko  
+4. Muhammad Fathi Bintang Amrullah  
+5. Revo Risky Pratama  
+6. Denok Intan Permata Sari  
+7. Muhammad Ilham  
+8. Fadhlan Yuqa Tahtadika
