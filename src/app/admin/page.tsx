@@ -38,11 +38,6 @@ type DashboardReport = {
   created_at: string;
 };
 
-type TaskTrend = {
-  date: string;
-  created: number;
-  completed: number;
-};
 
 type SignupTrend = {
   weekStart: string;
@@ -58,7 +53,7 @@ type DashboardResponse = {
     weeklyActiveUsers: number;
     activeWorkspaces: number;
   };
-  taskTrends: TaskTrend[];
+  // taskTrends removed — dashboard no longer exposes task trend table
   growth: {
     signupTrend: SignupTrend[];
     retentionRate30d: number;
@@ -70,7 +65,7 @@ export default function DashboardPage() {
   const [recentTasks, setRecentTasks] = useState<DashboardTask[]>([]);
   const [users, setUsers] = useState<DashboardUser[]>([]);
   const [reports, setReports] = useState<DashboardReport[]>([]);
-  const [taskTrends, setTaskTrends] = useState<TaskTrend[]>([]);
+  // taskTrends state removed (no UI table)
   const [signupTrend, setSignupTrend] = useState<SignupTrend[]>([]);
   const [metrics, setMetrics] = useState({
     dailyActiveUsers: 0,
@@ -98,14 +93,12 @@ export default function DashboardPage() {
         setRecentTasks([]);
         setUsers([]);
         setReports([]);
-        setTaskTrends([]);
         setSignupTrend([]);
       } else {
         const parsed = data as DashboardResponse;
         setRecentTasks(parsed.tasks ?? []);
         setUsers(parsed.users ?? []);
         setReports(parsed.reports ?? []);
-        setTaskTrends(parsed.taskTrends ?? []);
         setSignupTrend(parsed.growth?.signupTrend ?? []);
         setMetrics(parsed.metrics ?? { dailyActiveUsers: 0, weeklyActiveUsers: 0, activeWorkspaces: 0 });
         setRetentionRate30d(parsed.growth?.retentionRate30d ?? 0);
@@ -221,40 +214,8 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <h3 className="text-lg font-bold text-gray-800">Task Created vs Completed (7 days)</h3>
-          </div>
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <div className="p-6 text-sm text-gray-500">Loading task trends...</div>
-            ) : taskTrends.length === 0 ? (
-              <div className="p-6 text-sm text-gray-500">No trend data available.</div>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-white border-b border-gray-100 text-sm text-gray-500">
-                    <th className="p-4 font-semibold">Date</th>
-                    <th className="p-4 font-semibold">Created</th>
-                    <th className="p-4 font-semibold">Completed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {taskTrends.map((item) => (
-                    <tr key={item.date} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 text-sm text-gray-700">{item.date}</td>
-                      <td className="p-4 text-sm font-semibold text-blue-700">{item.created}</td>
-                      <td className="p-4 text-sm font-semibold text-green-700">{item.completed}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col lg:col-span-2">
           <h3 className="text-lg font-bold text-gray-800 mb-6">Signup Growth (8 weeks)</h3>
 
           <div className="flex-1 flex flex-col gap-3">
