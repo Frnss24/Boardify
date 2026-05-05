@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
-// No. 9 - READ: GET semua tasks
+//READ: GET semua tasks
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const boardId = searchParams.get('board_id')
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   return NextResponse.json(data)
 }
 
-// No. 8 - CREATE: POST task baru
+//CREATE: POST task baru
 export async function POST(request: Request) {
   const body = await request.json()
   const { board_id, assignee_id, title, description, status, due_date } = body
