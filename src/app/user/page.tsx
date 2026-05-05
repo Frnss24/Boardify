@@ -134,6 +134,7 @@ export default function UserDashboard() {
       comments: 0,
       attachments: 0,
       dueDate: formatDueDate(row.due_date),
+      startDate: formatDueDate(row.start_date),
     };
     return { column, task };
   };
@@ -298,6 +299,7 @@ export default function UserDashboard() {
           title: task.title,
           description: task.description,
           status: column,
+          start_date: parseDueDateInput((task as any).startDate),
           due_date: parseDueDateInput(task.dueDate),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -362,6 +364,7 @@ export default function UserDashboard() {
         title: updatedTask.title,
         description: updatedTask.description,
         status: column,
+        start_date: parseDueDateInput((updatedTask as any).startDate),
         due_date: parseDueDateInput(updatedTask.dueDate),
         updated_at: new Date().toISOString(),
       })
@@ -400,17 +403,23 @@ export default function UserDashboard() {
           ...task,
           status: column,
           due: parseDueDate(task.dueDate),
+          start: task.startDate ? parseDueDate(task.startDate) : null,
         }))
       )
-      .sort((a, b) => a.due.getTime() - b.due.getTime());
+      .sort((a, b) => {
+        const aKey = a.start ? a.start.getTime() : a.due.getTime();
+        const bKey = b.start ? b.start.getTime() : b.due.getTime();
+        return aKey - bKey;
+      });
 
-    const anchor = rows.length > 0 ? new Date(rows[0].due) : new Date();
+    const anchor = rows.length > 0 ? new Date(rows[0].start || rows[0].due) : new Date();
     anchor.setDate(anchor.getDate() - 2);
 
     return rows.map((row) => {
-      const start  = Math.max(0, diffInDays(anchor, row.due) - 2);
-      const length = row.status === "done" ? 3 : row.status === "doing" ? 5 : 4;
-      return { ...row, start, length };
+      const realStart = row.start || row.due;
+      const startOffset = Math.max(0, diffInDays(anchor, realStart));
+      const lengthDays = Math.max(1, diffInDays(realStart, row.due) || 1);
+      return { ...row, start: startOffset, length: lengthDays };
     });
   }, [tasks]);
 
