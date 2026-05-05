@@ -289,15 +289,15 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
           )}
         </div>
 
-        {/* Join View Button */}
+        {/* Reports Button */}
         <button
-          onClick={() => router.push('/user/join-view')}
+          onClick={() => router.push('/reports')}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-600 text-sm font-medium transition-all duration-200 hover:bg-gray-100 ml-2"
           style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}
-          title="View JOIN query results"
+          title="View Reports"
         >
           <Database size={16} />
-          <span className="hidden md:inline">Join View</span>
+          <span className="hidden md:inline">Reports</span>
         </button>
 
         {/* New Task Button */}

@@ -54,6 +54,7 @@ export default function UserDashboard() {
   const [reportMessage, setReportMessage] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   // ── SEARCH STATE (fitur tugasmu) ──────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -338,7 +339,54 @@ export default function UserDashboard() {
     if (updateError) {
       console.error('Failed to update task status:', updateError.message);
     }
-  }, []);
+  }, [supabase]);
+
+  const findTaskColumn = (taskId: string): ColumnType | null => {
+    for (const col of ["todo", "doing", "done"] as ColumnType[]) {
+      if (tasks[col].some((t) => t.id === taskId)) return col;
+    }
+    return null;
+  };
+
+  const handleOpenEdit = (task: Task) => {
+    setEditingTask(task);
+    setModalOpen(true);
+  };
+
+  const handleSaveTask = async (updatedTask: Task, column: ColumnType) => {
+    if (!boardId) return;
+
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({
+        title: updatedTask.title,
+        description: updatedTask.description,
+        status: column,
+        due_date: parseDueDateInput(updatedTask.dueDate),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', updatedTask.id);
+
+    if (updateError) {
+      console.error('Failed to save task:', updateError.message);
+      return;
+    }
+
+    const oldColumn = findTaskColumn(updatedTask.id);
+    if (oldColumn) {
+      setTasks((prev) => ({
+        ...prev,
+        [oldColumn]: prev[oldColumn].map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+        ...(column !== oldColumn && {
+          [column]: [updatedTask, ...prev[column]],
+          [oldColumn]: prev[oldColumn].filter((t) => t.id !== updatedTask.id),
+        }),
+      }));
+    }
+
+    setEditingTask(null);
+    setModalOpen(false);
+  };
 
   const completed  = tasks.done.length;
   const inProgress = tasks.doing.length;
@@ -536,9 +584,7 @@ export default function UserDashboard() {
                       }));
                     })();
                   }}
-                  onEditTask={(task) => {
-                    console.log("Edit task:", task);
-                  }}
+                  onEditTask={(task) => handleOpenEdit(task)}
                 />
               ))}
             </div>
@@ -628,8 +674,10 @@ export default function UserDashboard() {
       <NewTaskModal
         open={modalOpen}
         defaultColumn={defaultColumn}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setEditingTask(null); }}
         onAdd={handleAddTask}
+        editing={editingTask}
+        onSave={handleSaveTask}
       />
 
       {reportOpen && (

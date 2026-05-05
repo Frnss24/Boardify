@@ -16,6 +16,7 @@ export interface Task {
   comments: number;
   attachments: number;
   dueDate: string;
+  startDate?: string;
   progress?: number;
 }
 
@@ -196,7 +197,15 @@ export function TaskCard({ task, index, column, onDelete, onDeletePermanently, o
           {task.dueDate && (
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Calendar size={11} />
-              {task.dueDate}
+              {(() => {
+                try {
+                  const d = new Date(task.dueDate);
+                  if (!isNaN(d.getTime())) {
+                    return `${d.toLocaleString(undefined, { month: 'short' })} ${d.getDate()}`;
+                  }
+                } catch (e) {}
+                return task.dueDate;
+              })()}
             </span>
           )}
           {task.comments > 0 && (

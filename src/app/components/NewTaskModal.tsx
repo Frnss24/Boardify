@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { X, Flag, Tag, User, Calendar } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Priority, Category, Task } from "./TaskCard";
@@ -9,6 +9,9 @@ interface NewTaskModalProps {
   defaultColumn?: ColumnType;
   onClose: () => void;
   onAdd: (task: Task, column: ColumnType) => void;
+  // optional editing props
+  editing?: Task | null;
+  onSave?: (task: Task, column: ColumnType) => void;
 }
 
 const priorities: Priority[] = ["High", "Medium", "Low"];
@@ -34,33 +37,76 @@ const categoryColors: Record<Category, string> = {
   DevOps: "#6366f1",
 };
 
-export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd }: NewTaskModalProps) {
+export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd, editing = null, onSave }: NewTaskModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [category, setCategory] = useState<Category>("Development");
   const [column, setColumn] = useState<ColumnType>(defaultColumn);
   const [dueDate, setDueDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+
+  // sync editing -> prefill
+  React.useEffect(() => {
+    if (editing) {
+      setTitle(editing.title || "");
+      setDescription(editing.description || "");
+      setPriority(editing.priority || "Medium");
+      setCategory(editing.category || "Development");
+      setColumn(defaultColumn);
+      setDueDate(editing.dueDate || "");
+      setStartDate((editing as any).startDate || "");
+    } else if (!open) {
+      // reset when closed
+      setTitle("");
+      setDescription("");
+      setPriority("Medium");
+      setCategory("Development");
+      setColumn(defaultColumn);
+      setDueDate("");
+    }
+  }, [editing, open, defaultColumn]);
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    const newTask: Task = {
-      id: `task-${Date.now()}`,
-      title: title.trim(),
-      description: description.trim() || "No description provided.",
-      priority,
-      category,
-      assignees: ["JS"],
-      comments: 0,
-      attachments: 0,
-      dueDate: dueDate || "Apr 30",
-    };
-    onAdd(newTask, column);
+    
+    // Default to 5 days from now if not set
+    const defaultDueDate = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 5);
+      return d.toISOString().slice(0, 10);
+    })();
+    
+    const payload: Task = editing
+      ? { ...editing, title: title.trim(), description: description.trim() || "No description provided.", priority, category, dueDate: dueDate || editing.dueDate }
+      : {
+          id: `task-${Date.now()}`,
+          title: title.trim(),
+          description: description.trim() || "No description provided.",
+          priority,
+          category,
+          assignees: ["JS"],
+          comments: 0,
+          attachments: 0,
+          dueDate: dueDate || defaultDueDate,
+        };
+
+    if (editing && onSave) {
+      // attach startDate if present
+      (payload as any).startDate = startDate || (editing as any).startDate || null;
+      onSave(payload, column);
+    } else {
+      (payload as any).startDate = startDate || null;
+      onAdd(payload, column);
+    }
+
+    // Reset / close
     setTitle("");
     setDescription("");
     setPriority("Medium");
     setCategory("Development");
     setDueDate("");
+    setStartDate("");
     onClose();
   };
 
@@ -94,8 +140,8 @@ export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd }: N
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-6 pb-4">
                 <div>
-                  <h2 className="text-gray-900" style={{ fontSize: "1.05rem", fontWeight: 700 }}>Create New Task</h2>
-                  <p className="text-gray-400 mt-0.5" style={{ fontSize: "0.78rem" }}>Fill in the details below to add a task</p>
+                  <h2 className="text-gray-900" style={{ fontSize: "1.05rem", fontWeight: 700 }}>{editing ? 'Edit Task' : 'Create New Task'}</h2>
+                  <p className="text-gray-400 mt-0.5" style={{ fontSize: "0.78rem" }}>{editing ? 'Update the details and save changes' : 'Fill in the details below to add a task'}</p>
                 </div>
                 <button
                   onClick={onClose}
@@ -218,14 +264,27 @@ export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd }: N
                       <Calendar size={11} /> Due Date
                     </label>
                     <input
-                      type="text"
+                      type="date"
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
-                      placeholder="e.g. May 15"
                       className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                       style={{ background: "#f8f9fc", border: "1.5px solid transparent", color: "#374151" }}
                     />
                   </div>
+                </div>
+
+                {/* Start date */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">
+                    <Calendar size={11} /> Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                    style={{ background: "#f8f9fc", border: "1.5px solid transparent", color: "#374151" }}
+                  />
                 </div>
               </div>
 
@@ -246,7 +305,7 @@ export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd }: N
                     boxShadow: title.trim() ? "0 2px 8px rgba(99,102,241,0.35)" : "none",
                   }}
                 >
-                  Create Task
+                  {editing ? 'Save Changes' : 'Create Task'}
                 </button>
               </div>
             </div>
