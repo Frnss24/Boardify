@@ -9,7 +9,9 @@ interface NewTaskModalProps {
   defaultColumn?: ColumnType;
   onClose: () => void;
   onAdd: (task: Task, column: ColumnType) => void;
+  
   //editing props (opsional)
+  
   editing?: Task | null;
   onSave?: (task: Task, column: ColumnType) => void;
 }
