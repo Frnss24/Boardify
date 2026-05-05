@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, FileClock, Database } from "lucide-react";
+import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, FileClock } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import boardifyLogo from "../../../asset/Boardify.png";
 
@@ -139,14 +139,14 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
         {[
           { key: "board" as const, label: "Board", icon: LayoutGrid },
           { key: "timeline" as const, label: "Timeline", icon: ChartNoAxesGantt },
-          { key: "reports" as const, label: "Reports", icon: FileClock },
+          { key: "reports" as const, label: "Reports", icon: null },
         ].map((item) => {
           const isActive = activeView === item.key;
           return (
             <button
               key={item.key}
               onClick={() => onViewChange(item.key)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors"
+              className={`flex items-center ${item.icon ? "gap-1.5" : "gap-0"} px-3 py-1.5 rounded-lg text-sm transition-colors`}
               style={{
                 background: isActive ? "white" : "transparent",
                 color: isActive ? "#4f46e5" : "#6b7280",
@@ -154,7 +154,7 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
                 fontWeight: isActive ? 600 : 500,
               }}
             >
-              <item.icon size={14} />
+              {item.icon ? <item.icon size={14} /> : null}
               {item.label}
             </button>
           );
@@ -289,16 +289,7 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
           )}
         </div>
 
-        {/* Reports Button */}
-        <button
-          onClick={() => router.push('/reports')}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-600 text-sm font-medium transition-all duration-200 hover:bg-gray-100 ml-2"
-          style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}
-          title="View Reports"
-        >
-          <Database size={16} />
-          <span className="hidden md:inline">Reports</span>
-        </button>
+        {/* Right-side Reports button removed (duplicate) */}
 
         {/* New Task Button */}
         <button

@@ -602,32 +602,41 @@ export default function UserDashboard() {
               Gantt Timeline
             </div>
             <div className="space-y-3">
-              {timelineRows.map((item) => (
-                <div key={`${item.status}-${item.id}`} className="grid grid-cols-[210px_1fr] gap-3 items-center">
-                  <div className="pr-2">
-                    <p className="text-sm text-gray-800 truncate" style={{ fontWeight: 600 }}>{item.title}</p>
-                    <p className="text-xs text-gray-400">{item.status.toUpperCase()} • due {item.dueDate}</p>
-                  </div>
-                  <div className="h-8 rounded-lg relative overflow-hidden" style={{ background: "linear-gradient(90deg, #f8fafc, #f1f5f9)" }}>
-                    <div
-                      className="absolute top-1 bottom-1 rounded-md flex items-center px-2 text-[11px] text-white"
-                      style={{
-                        left: `${item.start * 3.1}%`,
-                        width: `${item.length * 3.1}%`,
-                        minWidth: "68px",
-                        background:
-                          item.status === "done"
-                            ? "linear-gradient(135deg, #10b981, #059669)"
-                            : item.status === "doing"
-                            ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                            : "linear-gradient(135deg, #6366f1, #4f46e5)",
-                      }}
-                    >
-                      {item.priority}
+              {timelineRows.map((item) => {
+                // compute approximate start date from due date and length
+                const dueObj = item.due instanceof Date ? item.due : new Date(item.due);
+                const approxStart = new Date(dueObj);
+                approxStart.setDate(approxStart.getDate() - Math.max(0, (item.length || 1) - 1));
+
+                const fmt = (d: Date) => d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString() : '-';
+
+                return (
+                  <div key={`${item.status}-${item.id}`} className="grid grid-cols-[210px_1fr] gap-3 items-center">
+                    <div className="pr-2">
+                      <p className="text-sm text-gray-800 truncate" style={{ fontWeight: 600 }}>{item.title}</p>
+                      <p className="text-xs text-gray-400">{item.status.toUpperCase()} • start {fmt(approxStart)} — due {item.dueDate}</p>
+                    </div>
+                    <div className="h-8 rounded-lg relative overflow-hidden" style={{ background: "linear-gradient(90deg, #f8fafc, #f1f5f9)" }}>
+                      <div
+                        className="absolute top-1 bottom-1 rounded-md flex items-center px-2 text-[11px] text-white"
+                        style={{
+                          left: `${item.start * 3.1}%`,
+                          width: `${item.length * 3.1}%`,
+                          minWidth: "68px",
+                          background:
+                            item.status === "done"
+                              ? "linear-gradient(135deg, #10b981, #059669)"
+                              : item.status === "doing"
+                              ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                              : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                        }}
+                      >
+                        {fmt(approxStart)} → {item.dueDate}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
