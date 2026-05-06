@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import boardifyLogo from "../../../asset/Boardify.png";
+import { isInvalidRefreshTokenError } from "@/lib/auth-utils";
 
 export type UserView = "board" | "timeline" | "reports";
 
@@ -90,6 +91,16 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
+        if (isInvalidRefreshTokenError(error)) {
+          const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          );
+          await supabase.auth.signOut();
+          router.push('/login');
+          router.refresh();
+          return;
+        }
         setUserName("User");
         setUserInitials("U");
       }

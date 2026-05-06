@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import { isInvalidRefreshTokenError } from "@/lib/auth-utils";
 
 interface TaskReportRow {
   task_id: string;
@@ -41,6 +42,29 @@ export default function ReportsPage() {
           setLoading(false);
           return;
         }
+
+        const requestedBoardId = typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("boardId")
+          : null;
+
+        const { data: boardsData, error: boardsError } = await supabase
+          .from("boards")
+          .select("id, owner_id, members")
+          .is("deleted_at", null);
+
+        if (boardsError) {
+          setError(boardsError.message);
+          setLoading(false);
+          return;
+        }
+
+        const accessibleBoards = (boardsData || []).filter((board: any) => {
+          if (board.owner_id === userId) return true;
+          const members = Array.isArray(board.members) ? board.members : [];
+          return members.some((member: any) => member?.user_id === userId);
+        });
+
+        const accessibleBoardIds = new Set(accessibleBoards.map((board: any) => board.id));
 
         // Ambil data dari VIEW Supabase (LEFT JOIN: tasks, boards, users)
         const { data, error: err } = await supabase
@@ -86,14 +110,20 @@ export default function ReportsPage() {
 
         const visible = isAdmin
           ? transformed
-          : transformed.filter(
-              (t: any) =>
-                t.assignee_id === userId || t.board_owner_id === userId
-            );
+          : transformed.filter((t: any) => {
+              if (requestedBoardId) {
+                return t.board_id === requestedBoardId;
+              }
+              return accessibleBoardIds.has(t.board_id);
+            });
 
         setTasks(visible);
         setLoading(false);
       } catch (err: any) {
+        if (isInvalidRefreshTokenError(err)) {
+          router.push('/login');
+          return;
+        }
         setError(err.message);
         setLoading(false);
       }

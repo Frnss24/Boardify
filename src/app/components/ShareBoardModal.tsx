@@ -1,24 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { createShareToken, type SharePermission } from "@/lib/share";
+import { useState } from "react";
+import { type SharePermission } from "@/lib/share";
 
 type ShareBoardModalProps = {
-  boardId: string;
+  boardShareCode: string | null;
   boardName: string;
   open: boolean;
   onClose: () => void;
 };
 
-export function ShareBoardModal({ boardId, boardName, open, onClose }: ShareBoardModalProps) {
+export function ShareBoardModal({ boardShareCode, boardName, open, onClose }: ShareBoardModalProps) {
   const [permission, setPermission] = useState<SharePermission>("view_only");
   const [copied, setCopied] = useState(false);
 
-  const shareData = useMemo(() => createShareToken(boardId, permission), [boardId, permission]);
-  const shareLink = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    return `${window.location.origin}/share/${shareData.token}?board=${boardId}&permission=${permission}&payload=${encodeURIComponent(shareData.payload)}`;
-  }, [boardId, permission, shareData.payload, shareData.token]);
+  const shareLink = typeof window === "undefined" || !boardShareCode
+    ? ""
+    : `${window.location.origin}/share/${boardShareCode}?permission=${permission}`;
 
   if (!open) return null;
 
@@ -57,7 +55,7 @@ export function ShareBoardModal({ boardId, boardName, open, onClose }: ShareBoar
         </div>
 
         <div className="mt-5 rounded-xl bg-gray-100 p-3 text-xs break-all text-gray-700">
-          {shareLink || "Generating link..."}
+          {boardShareCode ? shareLink : "No share code available yet."}
         </div>
 
         <div className="mt-6 flex gap-3">

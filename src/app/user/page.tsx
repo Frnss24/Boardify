@@ -9,10 +9,13 @@ import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { ShareBoardModal } from "../components/ShareBoardModal";
+import { BoardMembers } from "../components/BoardMembers";
 import { Task } from "../components/TaskCard";
 
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { isInvalidRefreshTokenError } from "@/lib/auth-utils";
+import { createShareCode } from "@/lib/share";
 
 const initialTasks: Record<ColumnType, Task[]> = {
   todo: [],
@@ -47,6 +50,7 @@ export default function UserDashboard() {
   const [boards, setBoards] = useState<any[]>([]);
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("My Board");
+  const [boardShareCode, setBoardShareCode] = useState<string | null>(null);
   
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>("");
@@ -64,15 +68,16 @@ export default function UserDashboard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
-  const [taskChangeLog, setTaskChangeLog] = useState<Array<{
+
+  type BoardActivityEntry = {
     id: string;
     taskId: string;
     taskTitle: string;
     fromStatus: string;
     toStatus: string;
     user: string;
-    timestamp: Date;
-  }>>([]);
+    timestamp: string;
+  };
 
   const filterTasks = (list: Task[]) => {
     if (!searchQuery.trim()) return list;
@@ -89,6 +94,15 @@ export default function UserDashboard() {
     doing: filterTasks(tasks.doing),
     done:  filterTasks(tasks.done),
   };
+
+  const currentBoard = useMemo(
+    () => boards.find((board) => board.id === boardId) || null,
+    [boards, boardId]
+  );
+
+  const currentBoardActivityLog = useMemo(() => {
+    return Array.isArray(currentBoard?.activity_log) ? currentBoard.activity_log as BoardActivityEntry[] : [];
+  }, [currentBoard]);
 
   const supabase = useMemo(
     () =>
@@ -225,12 +239,15 @@ export default function UserDashboard() {
 
         // default board kalo user blm bikin
         if (!activeBoard) {
+          const shareCode = createShareCode();
           const { data: createdBoard, error: createBoardError } = await supabase
             .from('boards')
             .insert([{
                 name: 'My Board',
                 description: 'Personal task board',
                 owner_id: sessionUser.id,
+                share_code: shareCode,
+                activity_log: [],
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               }])
@@ -244,14 +261,33 @@ export default function UserDashboard() {
           setBoards(mergedBoards || []);
         }
 
+        if (!activeBoard.share_code) {
+          const shareCode = createShareCode();
+          const { error: shareCodeError } = await supabase
+            .from('boards')
+            .update({ share_code: shareCode })
+            .eq('id', activeBoard.id);
+
+          if (!shareCodeError) {
+            activeBoard.share_code = shareCode;
+          }
+        }
+
         if (!isMounted) return;
 
         setBoardId(activeBoard.id);
         setBoardName(activeBoard.name || 'My Board');
+        setBoardShareCode(activeBoard.share_code || null);
         
         await fetchTasksForBoard(activeBoard.id);
 
       } catch (error) {
+        if (isInvalidRefreshTokenError(error)) {
+          await supabase.auth.signOut();
+          router.push('/login');
+          router.refresh();
+          return;
+        }
         const message = error instanceof Error ? error.message : 'Gagal memuat data';
         setLoadError(message);
         setIsLoading(false);
@@ -263,15 +299,18 @@ export default function UserDashboard() {
   }, [supabase, fetchTasksForBoard]);
 
   // Fungsi Ganti Board
-  const handleSwitchBoard = (newBoardId: string, newBoardName: string) => {
+  const handleSwitchBoard = (newBoardId: string, newBoardName: string, shareCode?: string | null) => {
+    const selectedBoard = boards.find((board) => board.id === newBoardId);
     setBoardId(newBoardId);
     setBoardName(newBoardName);
+    setBoardShareCode(shareCode ?? selectedBoard?.share_code ?? null);
     fetchTasksForBoard(newBoardId);
   };
 
   // Fungsi Bikin Board Baru
   const handleCreateBoard = async (newBoardName: string) => {
     if (!userId) return;
+    const shareCode = createShareCode();
     
     const { data: createdBoard, error } = await supabase
       .from('boards')
@@ -279,6 +318,7 @@ export default function UserDashboard() {
           name: newBoardName,
           description: 'New board',
           owner_id: userId,
+          share_code: shareCode,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
       }])
@@ -291,7 +331,7 @@ export default function UserDashboard() {
     }
 
     setBoards([...boards, createdBoard]);
-    handleSwitchBoard(createdBoard.id, createdBoard.name);
+    handleSwitchBoard(createdBoard.id, createdBoard.name, createdBoard.share_code || shareCode);
   };
 
   const handleLogout = async () => {
@@ -381,16 +421,32 @@ export default function UserDashboard() {
     // Catat perubahan status di audit log
     if (movedTask) {
       const statusLabels: Record<ColumnType, string> = { todo: "To Do", doing: "Doing", done: "Done" };
-      const taskTitle = movedTask.title;
-      setTaskChangeLog((prev) => [{
+      const nextActivityEntry: BoardActivityEntry = {
         id: `${taskId}-${Date.now()}`,
         taskId,
-        taskTitle,
+        taskTitle: movedTask.title,
         fromStatus: statusLabels[from],
         toStatus: statusLabels[to],
         user: userEmail || "Unknown",
-        timestamp: new Date(),
-      }, ...prev]);
+        timestamp: new Date().toISOString(),
+      };
+
+      const nextActivityLog = [nextActivityEntry, ...currentBoardActivityLog].slice(0, 100);
+      setBoards((prev) => prev.map((board) => (
+        board.id === boardId ? { ...board, activity_log: nextActivityLog } : board
+      )));
+
+      const { error: activityError } = await supabase
+        .from('boards')
+        .update({
+          activity_log: nextActivityLog,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', boardId);
+
+      if (activityError) {
+        console.error('Failed to save board activity log:', activityError.message);
+      }
     }
     
     const { error: updateError } = await supabase
@@ -398,7 +454,7 @@ export default function UserDashboard() {
       .update({ status: to, updated_at: new Date().toISOString() })
       .eq('id', taskId);
     if (updateError) console.error('Failed to update task status:', updateError.message);
-  }, [supabase, userEmail]);
+  }, [supabase, userEmail, boardId, currentBoardActivityLog]);
 
   const findTaskColumn = (taskId: string): ColumnType | null => {
     for (const col of ["todo", "doing", "done"] as ColumnType[]) {
@@ -592,8 +648,8 @@ export default function UserDashboard() {
   }, [reportChartData, reportRows.length]);
 
   const reportAuditLog = useMemo(() => {
-    return taskChangeLog;
-  }, [taskChangeLog]);
+    return currentBoardActivityLog;
+  }, [currentBoardActivityLog]);
 
   const exportReportCsv = () => {
     const header = ["Task", "Status", "Priority", "Category", "Assignees", "Due"];
@@ -728,51 +784,70 @@ export default function UserDashboard() {
 
       {activeView === "board" && (
         <div className="flex-1 px-6 pb-8">
-          <DndProvider backend={HTML5Backend}>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-40 text-sm text-gray-500">Loading tasks...</div>
-            ) : loadError ? (
-              <div className="text-sm text-red-500">{loadError}</div>
-            ) : (
-            <div className={viewMode === "list" ? "flex flex-col gap-4 h-full" : "flex gap-4 h-full"} style={{ alignItems: viewMode === "list" ? "stretch" : "flex-start" }}>
-              {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
-                <KanbanColumn
-                  key={col}
-                  type={col}
-                  tasks={filteredTasks[col]}
-                  onAddTask={openModal}
-                  onMoveTask={handleMoveTask}
-                  onDeleteTask={(id) => {
-                    void (async () => {
-                      const { error: deleteError } = await supabase
-                        .from('tasks')
-                        .update({ deleted_at: new Date().toISOString() })
-                        .eq('id', id);
-                      if (deleteError) { console.error('Failed to delete task:', deleteError.message); return; }
-                      setTasks((prev) => ({
-                        todo: prev.todo.filter((t) => t.id !== id),
-                        doing: prev.doing.filter((t) => t.id !== id),
-                        done: prev.done.filter((t) => t.id !== id),
-                      }));
-                    })();
-                  }}
-                  onDeleteTaskPermanently={(id) => {
-                    void (async () => {
-                      const { error: deleteError } = await supabase.from('tasks').delete().eq('id', id);
-                      if (deleteError) { console.error('Failed to permanently delete task:', deleteError.message); return; }
-                      setTasks((prev) => ({
-                        todo: prev.todo.filter((t) => t.id !== id),
-                        doing: prev.doing.filter((t) => t.id !== id),
-                        done: prev.done.filter((t) => t.id !== id),
-                      }));
-                    })();
-                  }}
-                  onEditTask={(task) => handleOpenEdit(task)}
-                />
-              ))}
+          <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
+            <div className="rounded-2xl border border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Board Workspace</h2>
+                  <p className="text-xs text-gray-500">Tasks for {boardName}</p>
+                </div>
+                <span className="text-xs text-gray-400">{currentBoard?.share_code ? "Shared link ready" : "No share code"}</span>
+              </div>
+
+              <DndProvider backend={HTML5Backend}>
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-40 text-sm text-gray-500">Loading tasks...</div>
+                ) : loadError ? (
+                  <div className="text-sm text-red-500">{loadError}</div>
+                ) : (
+                <div className={viewMode === "list" ? "flex flex-col gap-4 h-full" : "flex gap-4 h-full"} style={{ alignItems: viewMode === "list" ? "stretch" : "flex-start" }}>
+                  {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
+                    <KanbanColumn
+                      key={col}
+                      type={col}
+                      tasks={filteredTasks[col]}
+                      onAddTask={openModal}
+                      onMoveTask={handleMoveTask}
+                      onDeleteTask={(id) => {
+                        void (async () => {
+                          const { error: deleteError } = await supabase
+                            .from('tasks')
+                            .update({ deleted_at: new Date().toISOString() })
+                            .eq('id', id);
+                          if (deleteError) { console.error('Failed to delete task:', deleteError.message); return; }
+                          setTasks((prev) => ({
+                            todo: prev.todo.filter((t) => t.id !== id),
+                            doing: prev.doing.filter((t) => t.id !== id),
+                            done: prev.done.filter((t) => t.id !== id),
+                          }));
+                        })();
+                      }}
+                      onDeleteTaskPermanently={(id) => {
+                        void (async () => {
+                          const { error: deleteError } = await supabase.from('tasks').delete().eq('id', id);
+                          if (deleteError) { console.error('Failed to permanently delete task:', deleteError.message); return; }
+                          setTasks((prev) => ({
+                            todo: prev.todo.filter((t) => t.id !== id),
+                            doing: prev.doing.filter((t) => t.id !== id),
+                            done: prev.done.filter((t) => t.id !== id),
+                          }));
+                        })();
+                      }}
+                      onEditTask={(task) => handleOpenEdit(task)}
+                    />
+                  ))}
+                </div>
+                )}
+              </DndProvider>
             </div>
-            )}
-          </DndProvider>
+
+            <BoardMembers
+              boardId={boardId}
+              boardName={boardName}
+              ownerId={currentBoard?.owner_id || null}
+              members={Array.isArray(currentBoard?.members) ? currentBoard.members : []}
+            />
+          </div>
         </div>
       )}
 
@@ -953,7 +1028,7 @@ export default function UserDashboard() {
                             <p className="text-sm font-semibold text-gray-800">{item.taskTitle}</p>
                             <p className="text-xs text-gray-500 mt-1">{item.user} moved from <span className="font-medium">{item.fromStatus}</span> to <span className="font-medium">{item.toStatus}</span></p>
                           </div>
-                          <span className="text-xs text-gray-500 whitespace-nowrap">{item.timestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          <span className="text-xs text-gray-500 whitespace-nowrap">{new Date(item.timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
                         </div>
                       </div>
                     ))
@@ -1076,7 +1151,7 @@ export default function UserDashboard() {
       )}
 
       <ShareBoardModal
-        boardId={boardId || ""}
+        boardShareCode={boardShareCode}
         boardName={boardName}
         open={shareOpen}
         onClose={() => setShareOpen(false)}
