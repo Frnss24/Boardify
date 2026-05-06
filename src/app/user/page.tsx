@@ -204,29 +204,20 @@ export default function UserDashboard() {
           ? new URLSearchParams(window.location.search).get("boardId")
           : null;
 
-        const { data: ownedBoards, error: ownedBoardsError } = await supabase
+        const { data: allBoards, error: allBoardsError } = await supabase
           .from('boards')
           .select('*')
-          .eq('owner_id', sessionUser.id)
           .is('deleted_at', null)
           .order('created_at', { ascending: true });
 
-        if (ownedBoardsError) throw new Error(ownedBoardsError.message || 'Gagal mengambil board');
+        if (allBoardsError) throw new Error(allBoardsError.message || 'Gagal mengambil board');
 
-        const { data: sharedBoards, error: sharedBoardsError } = await supabase
-          .from('boards')
-          .select('*')
-          .is('deleted_at', null)
-          .contains('members', [{ user_id: sessionUser.id }]);
+        const mergedBoards = (allBoards || []).filter((board: any) => {
+          if (board.owner_id === sessionUser.id) return true;
 
-        if (sharedBoardsError) throw new Error(sharedBoardsError.message || 'Gagal mengambil board yang dibagikan');
-
-        const mergedBoards = [
-          ...(ownedBoards || []),
-          ...((sharedBoards || []).filter(
-            (sharedBoard: any) => !(ownedBoards || []).some((ownedBoard: any) => ownedBoard.id === sharedBoard.id)
-          )),
-        ];
+          const members = Array.isArray(board.members) ? board.members : [];
+          return members.some((member: any) => member?.user_id === sessionUser.id);
+        });
 
         let activeBoard = requestedBoardId
           ? mergedBoards.find((board: any) => board.id === requestedBoardId) ?? null
