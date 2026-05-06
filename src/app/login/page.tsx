@@ -50,6 +50,14 @@ export default function LoginPage() {
         .single();
 
       let resolvedRole = userRecord?.role || data.user.user_metadata?.role || 'user';
+      const nextPath = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('next')
+        : null;
+
+      if (nextPath && nextPath.startsWith('/')) {
+        router.push(nextPath);
+        return;
+      }
 
       // Redirect berdasarkan role
       if (resolvedRole === 'admin') {

@@ -80,7 +80,7 @@ export default function ShareJoinPage() {
       }
 
       setMessage("You have joined the board.");
-      router.push("/user");
+      router.push(`/user?boardId=${encodeURIComponent(boardId)}`);
     };
 
     void run();

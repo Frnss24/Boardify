@@ -200,18 +200,37 @@ export default function UserDashboard() {
 
         setUserId(sessionUser.id);
         setUserEmail(sessionUser.email || "");
+        const requestedBoardId = typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("boardId")
+          : null;
 
-        // Ambil SEMUA board, hilangkan .limit(1)
-        const { data: boardsData, error: boardsError } = await supabase
+        const { data: ownedBoards, error: ownedBoardsError } = await supabase
           .from('boards')
           .select('*')
           .eq('owner_id', sessionUser.id)
           .is('deleted_at', null)
           .order('created_at', { ascending: true });
 
-        if (boardsError) throw new Error(boardsError.message || 'Gagal mengambil board');
+        if (ownedBoardsError) throw new Error(ownedBoardsError.message || 'Gagal mengambil board');
 
-        let activeBoard = boardsData?.[0] ?? null;
+        const { data: sharedBoards, error: sharedBoardsError } = await supabase
+          .from('boards')
+          .select('*')
+          .is('deleted_at', null)
+          .contains('members', [{ user_id: sessionUser.id }]);
+
+        if (sharedBoardsError) throw new Error(sharedBoardsError.message || 'Gagal mengambil board yang dibagikan');
+
+        const mergedBoards = [
+          ...(ownedBoards || []),
+          ...((sharedBoards || []).filter(
+            (sharedBoard: any) => !(ownedBoards || []).some((ownedBoard: any) => ownedBoard.id === sharedBoard.id)
+          )),
+        ];
+
+        let activeBoard = requestedBoardId
+          ? mergedBoards.find((board: any) => board.id === requestedBoardId) ?? null
+          : mergedBoards[0] ?? null;
 
         // default board kalo user blm bikin
         if (!activeBoard) {
@@ -231,7 +250,7 @@ export default function UserDashboard() {
           activeBoard = createdBoard;
           setBoards([activeBoard]);
         } else {
-          setBoards(boardsData || []);
+          setBoards(mergedBoards || []);
         }
 
         if (!isMounted) return;
