@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import {
   Users,
-  Search,
   Bell,
   TrendingUp,
   Clock,
@@ -175,8 +174,7 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-800">Admin Overview</h1>
         <div className="flex gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input type="text" placeholder="Search..." className="pl-10 pr-4 py-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="text" placeholder="Search..." className="pr-4 py-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <button className="p-2 bg-white border rounded-full text-gray-500 hover:text-blue-600 shadow-sm">
             <Bell size={20} />
