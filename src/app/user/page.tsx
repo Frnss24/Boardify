@@ -62,6 +62,15 @@ export default function UserDashboard() {
   const [reportSortDirection, setReportSortDirection] = useState<"asc" | "desc">("asc");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [taskChangeLog, setTaskChangeLog] = useState<Array<{
+    id: string;
+    taskId: string;
+    taskTitle: string;
+    fromStatus: string;
+    toStatus: string;
+    user: string;
+    timestamp: Date;
+  }>>([]);
 
   const filterTasks = (list: Task[]) => {
     if (!searchQuery.trim()) return list;
@@ -348,18 +357,35 @@ export default function UserDashboard() {
 
   const handleMoveTask = useCallback(async (taskId: string, from: ColumnType, to: ColumnType) => {
     if (from === to) return;
+    let movedTask: Task | undefined;
     setTasks((prev) => {
       const fromList = prev[from].filter((t) => t.id !== taskId);
       const moved = prev[from].find((t) => t.id === taskId);
       if (!moved) return prev;
+      movedTask = moved;
       return { ...prev, [from]: fromList, [to]: [moved, ...prev[to]] };
     });
+    
+    // Catat perubahan status di audit log
+    if (movedTask) {
+      const statusLabels: Record<ColumnType, string> = { todo: "To Do", doing: "Doing", done: "Done" };
+      setTaskChangeLog((prev) => [{
+        id: `${taskId}-${Date.now()}`,
+        taskId,
+        taskTitle: movedTask.title,
+        fromStatus: statusLabels[from],
+        toStatus: statusLabels[to],
+        user: userEmail || "Unknown",
+        timestamp: new Date(),
+      }, ...prev]);
+    }
+    
     const { error: updateError } = await supabase
       .from('tasks')
       .update({ status: to, updated_at: new Date().toISOString() })
       .eq('id', taskId);
     if (updateError) console.error('Failed to update task status:', updateError.message);
-  }, [supabase]);
+  }, [supabase, userEmail]);
 
   const findTaskColumn = (taskId: string): ColumnType | null => {
     for (const col of ["todo", "doing", "done"] as ColumnType[]) {
@@ -553,21 +579,8 @@ export default function UserDashboard() {
   }, [reportChartData, reportRows.length]);
 
   const reportAuditLog = useMemo(() => {
-    return reportRows
-      .flatMap((row) => {
-        const timestamp = row.updatedAt || row.createdAt;
-        if (!timestamp) return [];
-        return [{
-          id: row.id,
-          title: row.title,
-          status: row.status,
-          type: row.updatedAt && row.updatedAt !== row.createdAt ? "Updated" : "Created",
-          date: new Date(timestamp),
-        }];
-      })
-      .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .slice(0, 6);
-  }, [reportRows]);
+    return taskChangeLog;
+  }, [taskChangeLog]);
 
   const exportReportCsv = () => {
     const header = ["Task", "Status", "Priority", "Category", "Assignees", "Due"];
@@ -909,17 +922,17 @@ export default function UserDashboard() {
                 <div className="space-y-2">
                   {reportAuditLog.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500 text-center">
-                      No recent audit activity yet
+                      No recent status changes yet
                     </div>
                   ) : (
                     reportAuditLog.map((item) => (
-                      <div key={`${item.id}-${item.date.toISOString()}`} className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                      <div key={item.id} className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-gray-800">{item.title}</p>
-                            <p className="text-xs text-gray-500 mt-1">{item.type} • {item.status}</p>
+                            <p className="text-sm font-semibold text-gray-800">{item.taskTitle}</p>
+                            <p className="text-xs text-gray-500 mt-1">{item.user} moved from <span className="font-medium">{item.fromStatus}</span> to <span className="font-medium">{item.toStatus}</span></p>
                           </div>
-                          <span className="text-xs text-gray-500">{item.date.toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-500 whitespace-nowrap">{item.timestamp.toLocaleTimeString()}</span>
                         </div>
                       </div>
                     ))
