@@ -42,7 +42,7 @@ export default function UserDashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
   const [activeView, setActiveView] = useState<UserView>("board");
-  const [viewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("My Board");
   const [userId, setUserId] = useState<string | null>(null);
@@ -54,6 +54,10 @@ export default function UserDashboard() {
   const [reportMessage, setReportMessage] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [reportStatusFilter, setReportStatusFilter] = useState<"all" | ColumnType>("all");
+  const [reportPriorityFilter, setReportPriorityFilter] = useState<"all" | "High" | "Medium" | "Low">("all");
+  const [reportSortBy, setReportSortBy] = useState<"dueDate" | "title" | "status">("dueDate");
+  const [reportSortDirection, setReportSortDirection] = useState<"asc" | "desc">("asc");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   // ── SEARCH STATE (fitur tugasmu) ──────────────────────────────
@@ -135,6 +139,8 @@ export default function UserDashboard() {
       attachments: 0,
       dueDate: formatDueDate(row.due_date),
       startDate: formatDueDate(row.start_date),
+      createdAt: row.created_at || null,
+      updatedAt: row.updated_at || null,
     };
     return { column, task };
   };
@@ -430,20 +436,157 @@ export default function UserDashboard() {
       done: "Done",
     };
 
+    const statusOrder: Record<string, number> = {
+      todo: 1,
+      doing: 2,
+      done: 3,
+    };
+
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
     return (["todo", "doing", "done"] as ColumnType[])
       .flatMap((column) =>
-        tasks[column].map((task) => ({
-          id: task.id,
-          title: task.title,
-          assignees: task.assignees.join(", "),
-          priority: task.priority,
-          category: task.category,
-          dueDate: task.dueDate,
-          status: statusLabel[column],
-        }))
+        tasks[column]
+          .filter((task) => reportStatusFilter === "all" || column === reportStatusFilter)
+          .filter((task) => reportPriorityFilter === "all" || task.priority === reportPriorityFilter)
+          .filter((task) => {
+            if (!normalizedQuery) return true;
+            return [
+              task.title,
+              task.description,
+              task.category,
+              task.priority,
+              task.assignees.join(' '),
+            ]
+              .some((value) => value.toLowerCase().includes(normalizedQuery));
+          })
+          .map((task) => {
+            const dueDate = parseDueDate(task.dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const isOverdue = dueDate < today && column !== "done";
+            return {
+              id: task.id,
+              title: task.title,
+              assignees: task.assignees.join(", "),
+              priority: task.priority,
+              category: task.category,
+              dueDate: task.dueDate,
+              status: statusLabel[column],
+              statusKey: column,
+              isOverdue,
+              createdAt: task.createdAt,
+              updatedAt: task.updatedAt,
+            };
+          })
       )
-      .sort((a, b) => parseDueDate(a.dueDate).getTime() - parseDueDate(b.dueDate).getTime());
-  }, [tasks]);
+      .sort((a, b) => {
+        const direction = reportSortDirection === 'asc' ? 1 : -1;
+        if (reportSortBy === 'title') {
+          return a.title.localeCompare(b.title) * direction;
+        }
+        if (reportSortBy === 'status') {
+          return (statusOrder[a.statusKey] - statusOrder[b.statusKey]) * direction;
+        }
+        const aDue = parseDueDate(a.dueDate).getTime();
+        const bDue = parseDueDate(b.dueDate).getTime();
+        return (aDue - bDue) * direction;
+      });
+  }, [tasks, reportStatusFilter, reportSortBy, reportSortDirection, searchQuery]);
+
+  const reportStats = useMemo(() => {
+    const total = reportRows.length;
+    const overdue = reportRows.filter((r) => r.isOverdue).length;
+    const highPriority = reportRows.filter((r) => r.priority === "High").length;
+    const grouped = reportRows.reduce(
+      (acc, row) => {
+        if (!acc[row.statusKey]) acc[row.statusKey] = [];
+        acc[row.statusKey].push(row);
+        return acc;
+      },
+      {} as Record<ColumnType, typeof reportRows>
+    );
+    return { total, overdue, highPriority, grouped };
+  }, [reportRows]);
+
+  const reportChartData = useMemo(() => {
+    const statusCounts = { todo: 0, doing: 0, done: 0 } as Record<ColumnType, number>;
+    const priorityCounts = { High: 0, Medium: 0, Low: 0 } as Record<string, number>;
+    reportRows.forEach((row) => {
+      statusCounts[row.statusKey] += 1;
+      priorityCounts[row.priority] += 1;
+    });
+    return { statusCounts, priorityCounts };
+  }, [reportRows]);
+
+  const reportStatusSegments = useMemo(() => {
+    const total = reportRows.length;
+    const radius = 38;
+    const circumference = 2 * Math.PI * radius;
+    let offset = 0;
+    return ([
+      { key: 'todo' as const, label: 'To Do', color: '#6366f1' },
+      { key: 'doing' as const, label: 'Doing', color: '#f59e0b' },
+      { key: 'done' as const, label: 'Done', color: '#10b981' },
+    ] as const).map(({ key, label, color }) => {
+      const count = reportChartData.statusCounts[key];
+      const length = total ? Math.round((count / total) * circumference) : 0;
+      const segment = {
+        key,
+        label,
+        color,
+        count,
+        length,
+        offset,
+        percentage: total ? Math.round((count / total) * 100) : 0,
+      };
+      offset -= length;
+      return segment;
+    });
+  }, [reportChartData, reportRows.length]);
+
+  const reportAuditLog = useMemo(() => {
+    return reportRows
+      .flatMap((row) => {
+        const timestamp = row.updatedAt || row.createdAt;
+        if (!timestamp) return [];
+        return [{
+          id: row.id,
+          title: row.title,
+          status: row.status,
+          type: row.updatedAt && row.updatedAt !== row.createdAt ? "Updated" : "Created",
+          date: new Date(timestamp),
+        }];
+      })
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .slice(0, 6);
+  }, [reportRows]);
+
+  const exportReportCsv = () => {
+    const header = ["Task", "Status", "Priority", "Category", "Assignees", "Due"];
+    const rows = reportRows.map((row) => [
+      row.title,
+      row.status,
+      row.priority,
+      row.category,
+      row.assignees,
+      row.dueDate,
+    ]);
+
+    const csvContent = [header, ...rows]
+      .map((values) => values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `task-reports-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f5f6fa 0%, #eef0f8 50%, #f0eef8 100%)" }}>
@@ -488,10 +631,18 @@ export default function UserDashboard() {
               <span className="hidden sm:inline">Sort</span>
             </button>
             <div className="flex items-center rounded-xl overflow-hidden mr-2" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
-              <button className="flex items-center px-3 py-2 transition-colors" style={{ background: viewMode === "grid" ? "white" : "transparent", color: viewMode === "grid" ? "#6366f1" : "#9ca3af" }}>
+              <button
+                onClick={() => setViewMode('grid')}
+                className="flex items-center px-3 py-2 transition-colors"
+                style={{ background: viewMode === "grid" ? "white" : "transparent", color: viewMode === "grid" ? "#6366f1" : "#9ca3af" }}
+              >
                 <LayoutGrid size={15} />
               </button>
-              <button className="flex items-center px-3 py-2 transition-colors" style={{ background: viewMode === "list" ? "white" : "transparent", color: viewMode === "list" ? "#6366f1" : "#9ca3af" }}>
+              <button
+                onClick={() => setViewMode('list')}
+                className="flex items-center px-3 py-2 transition-colors"
+                style={{ background: viewMode === "list" ? "white" : "transparent", color: viewMode === "list" ? "#6366f1" : "#9ca3af" }}
+              >
                 <List size={15} />
               </button>
             </div>
@@ -547,7 +698,7 @@ export default function UserDashboard() {
             ) : loadError ? (
               <div className="text-sm text-red-500">{loadError}</div>
             ) : (
-            <div className="flex gap-4 h-full" style={{ alignItems: "flex-start" }}>
+            <div className={viewMode === "list" ? "flex flex-col gap-4 h-full" : "flex gap-4 h-full"} style={{ alignItems: viewMode === "list" ? "stretch" : "flex-start" }}>
               {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
                 <KanbanColumn
                   key={col}
@@ -655,35 +806,217 @@ export default function UserDashboard() {
       {activeView === "reports" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2 text-gray-800" style={{ fontWeight: 700 }}>
-              <History size={18} />
-              All Task History
+            <div className="px-5 py-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-gray-800" style={{ fontWeight: 700 }}>
+              <div className="flex items-center gap-2">
+                <History size={18} />
+                <span>All Task History</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                    <span>Status</span>
+                    <select
+                      value={reportStatusFilter}
+                      onChange={(event) => setReportStatusFilter(event.target.value as "all" | ColumnType)}
+                      className="bg-transparent outline-none"
+                    >
+                      <option value="all">All</option>
+                      <option value="todo">To Do</option>
+                      <option value="doing">Doing</option>
+                      <option value="done">Done</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                    <span>Priority</span>
+                    <select
+                      value={reportPriorityFilter}
+                      onChange={(event) => setReportPriorityFilter(event.target.value as "all" | "High" | "Medium" | "Low")}
+                      className="bg-transparent outline-none"
+                    >
+                      <option value="all">All</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                    <span>Sort</span>
+                    <select
+                      value={reportSortBy}
+                      onChange={(event) => setReportSortBy(event.target.value as "dueDate" | "title" | "status")}
+                      className="bg-transparent outline-none"
+                    >
+                      <option value="dueDate">Due Date</option>
+                      <option value="title">Title</option>
+                      <option value="status">Status</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => setReportSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-100"
+                  >
+                    {reportSortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  </button>
+                  <button
+                    onClick={exportReportCsv}
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+            </div>
+            <div className="px-5 py-5 border-b border-gray-100 bg-white grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Task distribution</p>
+                    <p className="text-xs text-gray-500">Snapshot of status and priority for current reports</p>
+                  </div>
+                  <span className="text-xs text-gray-500">{reportRows.length} task{reportRows.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[120px_1fr] items-center">
+                  <div className="rounded-3xl bg-slate-50 p-4 flex items-center justify-center">
+                    <svg viewBox="0 0 120 120" className="h-28 w-28">
+                      <circle cx="60" cy="60" r="38" fill="transparent" stroke="#e2e8f0" strokeWidth="16" />
+                      {reportStatusSegments.map((segment) => (
+                        <circle
+                          key={segment.key}
+                          cx="60"
+                          cy="60"
+                          r="38"
+                          fill="transparent"
+                          stroke={segment.color}
+                          strokeWidth="16"
+                          strokeDasharray={`${segment.length} ${2 * Math.PI * 38 - segment.length}`}
+                          strokeDashoffset={segment.offset}
+                          strokeLinecap="round"
+                          transform="rotate(-90 60 60)"
+                        />
+                      ))}
+                    </svg>
+                  </div>
+                  <div className="space-y-3">
+                    {reportStatusSegments.map((segment) => (
+                      <div key={segment.key} className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: segment.color }} />
+                          <span>{segment.label}</span>
+                        </div>
+                        <span className="font-semibold">{segment.count}</span>
+                      </div>
+                    ))}
+                    <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-gray-500">
+                      {reportStatusSegments.map((segment) => (
+                        <div key={`${segment.key}-pct`} className="flex items-center justify-between">
+                          <span>{segment.label}</span>
+                          <span>{segment.percentage}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                  <span className="rounded-full bg-slate-100 px-2 py-1">High: {reportChartData.priorityCounts.High}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1">Medium: {reportChartData.priorityCounts.Medium}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1">Low: {reportChartData.priorityCounts.Low}</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Audit log</p>
+                    <p className="text-xs text-gray-500">Recent report activity</p>
+                  </div>
+                  <span className="text-xs text-gray-500">{reportAuditLog.length} entries</span>
+                </div>
+                <div className="space-y-2">
+                  {reportAuditLog.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500 text-center">
+                      No recent audit activity yet
+                    </div>
+                  ) : (
+                    reportAuditLog.map((item) => (
+                      <div key={`${item.id}-${item.date.toISOString()}`} className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{item.title}</p>
+                            <p className="text-xs text-gray-500 mt-1">{item.type} • {item.status}</p>
+                          </div>
+                          <span className="text-xs text-gray-500">{item.date.toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100">
-                    <th className="px-5 py-3">Task</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3">Priority</th>
-                    <th className="px-5 py-3">Category</th>
-                    <th className="px-5 py-3">Assignees</th>
-                    <th className="px-5 py-3">Due</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportRows.map((row) => (
-                    <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/70">
-                      <td className="px-5 py-3 text-sm text-gray-800" style={{ fontWeight: 600 }}>{row.title}</td>
-                      <td className="px-5 py-3 text-sm text-gray-600">{row.status}</td>
-                      <td className="px-5 py-3 text-sm text-gray-600">{row.priority}</td>
-                      <td className="px-5 py-3 text-sm text-gray-600">{row.category}</td>
-                      <td className="px-5 py-3 text-sm text-gray-600">{row.assignees}</td>
-                      <td className="px-5 py-3 text-sm text-gray-500">{row.dueDate}</td>
+              {Object.entries(reportStats.grouped).length === 0 ? (
+                <div className="px-5 py-8 text-center text-gray-400">No tasks found</div>
+              ) : (
+                <table className="min-w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100 bg-white">
+                      <th className="px-5 py-3 font-semibold">Task</th>
+                      <th className="px-5 py-3 font-semibold">Status</th>
+                      <th className="px-5 py-3 font-semibold">Priority</th>
+                      <th className="px-5 py-3 font-semibold">Category</th>
+                      <th className="px-5 py-3 font-semibold">Assignees</th>
+                      <th className="px-5 py-3 font-semibold">Due</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {Object.keys(reportStats.grouped)
+                      .sort((a, b) => {
+                        const order: Record<string, number> = { todo: 1, doing: 2, done: 3 };
+                        return (order[a] || 999) - (order[b] || 999);
+                      })
+                      .flatMap((statusKey) => {
+                        const statusLabel = { todo: "To Do", doing: "Doing", done: "Done" }[statusKey as ColumnType] || statusKey;
+                        const statusTasks = reportStats.grouped[statusKey as ColumnType] || [];
+                        const statusColor = statusKey === "done" ? "#10b981" : statusKey === "doing" ? "#f59e0b" : "#6366f1";
+                        return [
+                          <tr key={`group-header-${statusKey}`} className="h-px">
+                            <td colSpan={6} className="px-5 py-2 bg-gray-50 border-b border-gray-100">
+                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                <span className="inline-block w-2 h-2 rounded-full" style={{ background: statusColor }} />
+                                {statusLabel} ({statusTasks.length})
+                              </div>
+                            </td>
+                          </tr>,
+                          ...statusTasks.map((row, idx) => (
+                            <tr
+                              key={`${row.statusKey}-${row.id}`}
+                              className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                              style={{
+                                background: row.isOverdue ? "#fef2f2" : "white"
+                              }}
+                            >
+                              <td className="px-5 py-3 text-sm text-gray-800 font-semibold">
+                                {row.isOverdue && <span className="mr-2 inline-block px-2 py-1 rounded text-xs text-red-700 bg-red-100">OVERDUE</span>}
+                                {row.title}
+                              </td>
+                              <td className="px-5 py-3 text-sm text-gray-600">{row.status}</td>
+                              <td className="px-5 py-3 text-sm">
+                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                                  row.priority === "High" ? "bg-red-100 text-red-700" :
+                                  row.priority === "Medium" ? "bg-amber-100 text-amber-700" :
+                                  "bg-green-100 text-green-700"
+                                }`}>
+                                  {row.priority}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-sm text-gray-600">{row.category}</td>
+                              <td className="px-5 py-3 text-sm text-gray-600">{row.assignees}</td>
+                              <td className="px-5 py-3 text-sm" style={{ color: row.isOverdue ? "#dc2626" : "#9ca3af" }}>
+                                {row.dueDate}
+                              </td>
+                            </tr>
+                          ))
+                        ];
+                      })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

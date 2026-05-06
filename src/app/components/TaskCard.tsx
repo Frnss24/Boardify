@@ -18,6 +18,8 @@ export interface Task {
   dueDate: string;
   startDate?: string;
   progress?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const priorityConfig: Record<Priority, { color: string; bg: string; dot: string }> = {
