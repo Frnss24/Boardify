@@ -369,10 +369,11 @@ export default function UserDashboard() {
     // Catat perubahan status di audit log
     if (movedTask) {
       const statusLabels: Record<ColumnType, string> = { todo: "To Do", doing: "Doing", done: "Done" };
+      const taskTitle = movedTask.title;
       setTaskChangeLog((prev) => [{
         id: `${taskId}-${Date.now()}`,
         taskId,
-        taskTitle: movedTask.title,
+        taskTitle,
         fromStatus: statusLabels[from],
         toStatus: statusLabels[to],
         user: userEmail || "Unknown",
