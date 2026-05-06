@@ -173,9 +173,6 @@ export default function DashboardPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Admin Overview</h1>
         <div className="flex gap-4">
-          <div className="relative">
-            <input type="text" placeholder="Search..." className="pr-4 py-2 border rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
           <button className="p-2 bg-white border rounded-full text-gray-500 hover:text-blue-600 shadow-sm">
             <Bell size={20} />
           </button>
