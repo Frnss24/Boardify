@@ -8,6 +8,7 @@ import { Filter, SlidersHorizontal, LayoutGrid, List, LogOut, CalendarClock, His
 import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
+import { ShareBoardModal } from "../components/ShareBoardModal";
 import { Task } from "../components/TaskCard";
 
 import { useRouter } from "next/navigation";
@@ -62,6 +63,7 @@ export default function UserDashboard() {
   const [reportSortDirection, setReportSortDirection] = useState<"asc" | "desc">("asc");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
   const [taskChangeLog, setTaskChangeLog] = useState<Array<{
     id: string;
     taskId: string;
@@ -653,6 +655,14 @@ export default function UserDashboard() {
               <SlidersHorizontal size={14} />
               <span className="hidden sm:inline">Sort</span>
             </button>
+            <button
+              onClick={() => setShareOpen(true)}
+              disabled={!boardId}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-indigo-700 font-bold hover:bg-indigo-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ border: "1px solid rgba(99, 102, 241, 0.2)", background: "white" }}
+            >
+              <span className="hidden sm:inline">Share</span>
+            </button>
             <div className="flex items-center rounded-xl overflow-hidden mr-2" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
               <button
                 onClick={() => setViewMode('grid')}
@@ -1054,6 +1064,13 @@ export default function UserDashboard() {
           </div>
         </div>
       )}
+
+      <ShareBoardModal
+        boardId={boardId || ""}
+        boardName={boardName}
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+      />
     </div>
   );
 }
