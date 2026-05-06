@@ -45,10 +45,15 @@ export default function ShareJoinPage() {
         .from("boards")
         .select("members")
         .eq("id", boardId)
-        .single();
+        .maybeSingle();
 
-      if (boardError || !boardData) {
+      if (boardError) {
         setMessage(boardError?.message || "Board not found.");
+        return;
+      }
+
+      if (!boardData) {
+        setMessage("Board not found.");
         return;
       }
 
