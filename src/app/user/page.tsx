@@ -915,14 +915,14 @@ export default function UserDashboard() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Audit log</p>
-                    <p className="text-xs text-gray-500">Recent report activity</p>
+                    <p className="text-xs text-gray-500">Complete status change history</p>
                   </div>
                   <span className="text-xs text-gray-500">{reportAuditLog.length} entries</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[32rem] overflow-y-auto">
                   {reportAuditLog.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500 text-center">
-                      No recent status changes yet
+                      No status changes recorded yet
                     </div>
                   ) : (
                     reportAuditLog.map((item) => (
@@ -932,7 +932,7 @@ export default function UserDashboard() {
                             <p className="text-sm font-semibold text-gray-800">{item.taskTitle}</p>
                             <p className="text-xs text-gray-500 mt-1">{item.user} moved from <span className="font-medium">{item.fromStatus}</span> to <span className="font-medium">{item.toStatus}</span></p>
                           </div>
-                          <span className="text-xs text-gray-500 whitespace-nowrap">{item.timestamp.toLocaleTimeString()}</span>
+                          <span className="text-xs text-gray-500 whitespace-nowrap">{item.timestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
                         </div>
                       </div>
                     ))
