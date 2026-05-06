@@ -9,7 +9,6 @@ import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { ShareBoardModal } from "../components/ShareBoardModal";
-import { BoardMembers } from "../components/BoardMembers";
 import { Task } from "../components/TaskCard";
 
 import { useRouter } from "next/navigation";
@@ -784,69 +783,60 @@ export default function UserDashboard() {
 
       {activeView === "board" && (
         <div className="flex-1 px-6 pb-8">
-          <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_360px]">
-            <div className="rounded-2xl border border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900">Board Workspace</h2>
-                  <p className="text-xs text-gray-500">Tasks for {boardName}</p>
-                </div>
-                <span className="text-xs text-gray-400">{currentBoard?.share_code ? "Shared link ready" : "No share code"}</span>
+          <div className="rounded-2xl border border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Board Workspace</h2>
+                <p className="text-xs text-gray-500">Tasks for {boardName}</p>
               </div>
-
-              <DndProvider backend={HTML5Backend}>
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-40 text-sm text-gray-500">Loading tasks...</div>
-                ) : loadError ? (
-                  <div className="text-sm text-red-500">{loadError}</div>
-                ) : (
-                <div className={viewMode === "list" ? "flex flex-col gap-4 h-full" : "flex gap-4 h-full"} style={{ alignItems: viewMode === "list" ? "stretch" : "flex-start" }}>
-                  {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
-                    <KanbanColumn
-                      key={col}
-                      type={col}
-                      tasks={filteredTasks[col]}
-                      onAddTask={openModal}
-                      onMoveTask={handleMoveTask}
-                      onDeleteTask={(id) => {
-                        void (async () => {
-                          const { error: deleteError } = await supabase
-                            .from('tasks')
-                            .update({ deleted_at: new Date().toISOString() })
-                            .eq('id', id);
-                          if (deleteError) { console.error('Failed to delete task:', deleteError.message); return; }
-                          setTasks((prev) => ({
-                            todo: prev.todo.filter((t) => t.id !== id),
-                            doing: prev.doing.filter((t) => t.id !== id),
-                            done: prev.done.filter((t) => t.id !== id),
-                          }));
-                        })();
-                      }}
-                      onDeleteTaskPermanently={(id) => {
-                        void (async () => {
-                          const { error: deleteError } = await supabase.from('tasks').delete().eq('id', id);
-                          if (deleteError) { console.error('Failed to permanently delete task:', deleteError.message); return; }
-                          setTasks((prev) => ({
-                            todo: prev.todo.filter((t) => t.id !== id),
-                            doing: prev.doing.filter((t) => t.id !== id),
-                            done: prev.done.filter((t) => t.id !== id),
-                          }));
-                        })();
-                      }}
-                      onEditTask={(task) => handleOpenEdit(task)}
-                    />
-                  ))}
-                </div>
-                )}
-              </DndProvider>
+              <span className="text-xs text-gray-400">{currentBoard?.share_code ? "Shared link ready" : "No share code"}</span>
             </div>
 
-            <BoardMembers
-              boardId={boardId}
-              boardName={boardName}
-              ownerId={currentBoard?.owner_id || null}
-              members={Array.isArray(currentBoard?.members) ? currentBoard.members : []}
-            />
+            <DndProvider backend={HTML5Backend}>
+              {isLoading ? (
+                <div className="flex items-center justify-center h-40 text-sm text-gray-500">Loading tasks...</div>
+              ) : loadError ? (
+                <div className="text-sm text-red-500">{loadError}</div>
+              ) : (
+              <div className={viewMode === "list" ? "flex flex-col gap-4 h-full" : "flex gap-4 h-full"} style={{ alignItems: viewMode === "list" ? "stretch" : "flex-start" }}>
+                {(["todo", "doing", "done"] as ColumnType[]).map((col) => (
+                  <KanbanColumn
+                    key={col}
+                    type={col}
+                    tasks={filteredTasks[col]}
+                    onAddTask={openModal}
+                    onMoveTask={handleMoveTask}
+                    onDeleteTask={(id) => {
+                      void (async () => {
+                        const { error: deleteError } = await supabase
+                          .from('tasks')
+                          .update({ deleted_at: new Date().toISOString() })
+                          .eq('id', id);
+                        if (deleteError) { console.error('Failed to delete task:', deleteError.message); return; }
+                        setTasks((prev) => ({
+                          todo: prev.todo.filter((t) => t.id !== id),
+                          doing: prev.doing.filter((t) => t.id !== id),
+                          done: prev.done.filter((t) => t.id !== id),
+                        }));
+                      })();
+                    }}
+                    onDeleteTaskPermanently={(id) => {
+                      void (async () => {
+                        const { error: deleteError } = await supabase.from('tasks').delete().eq('id', id);
+                        if (deleteError) { console.error('Failed to permanently delete task:', deleteError.message); return; }
+                        setTasks((prev) => ({
+                          todo: prev.todo.filter((t) => t.id !== id),
+                          doing: prev.doing.filter((t) => t.id !== id),
+                          done: prev.done.filter((t) => t.id !== id),
+                        }));
+                      })();
+                    }}
+                    onEditTask={(task) => handleOpenEdit(task)}
+                  />
+                ))}
+              </div>
+              )}
+            </DndProvider>
           </div>
         </div>
       )}

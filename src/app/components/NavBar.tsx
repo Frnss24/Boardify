@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt } from "lucide-react";
+import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, Users } from "lucide-react";
+import { BoardMembers } from "./BoardMembers";
 import { createBrowserClient } from "@supabase/ssr";
 import boardifyLogo from "../../../asset/Boardify.png";
 import { isInvalidRefreshTokenError } from "@/lib/auth-utils";
@@ -30,7 +31,7 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
   const [userEmail, setUserEmail] = useState("");
   const [userInitials, setUserInitials] = useState("--");
 
-  const [activeDropdown, setActiveDropdown] = useState<"projects" | "notifications" | "profile" | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<"projects" | "notifications" | "profile" | "members" | null>(null);
   
   // State untuk buat board baru secara inline
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
@@ -118,7 +119,7 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
     router.refresh();
   };
 
-  const toggleDropdown = (name: "projects" | "notifications" | "profile", e: React.MouseEvent) => {
+  const toggleDropdown = (name: "projects" | "notifications" | "profile" | "members", e: React.MouseEvent) => {
     e.stopPropagation();
     if (activeDropdown === name) {
       setActiveDropdown(null);
@@ -274,19 +275,24 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
       <div className="flex items-center gap-2 ml-auto">
         <div className="relative">
           <button
-            onClick={(e) => toggleDropdown("notifications", e)}
-            className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${activeDropdown === 'notifications' ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-50 text-gray-500'}`}
+            onClick={(e) => toggleDropdown("members", e)}
+            className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${activeDropdown === 'members' ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-50 text-gray-500'}`}
           >
-            <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border border-white" style={{ background: "#ef4444" }} />
+            <Users size={18} />
           </button>
-          {activeDropdown === "notifications" && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
-              <div className="px-4 py-2 flex justify-between items-center border-b border-gray-50">
-                <span className="text-sm font-bold text-gray-800">Notifications</span>
-              </div>
-              <div className="px-4 py-8 text-center text-gray-400 text-sm">
-                No new notifications
+          {activeDropdown === "members" && (
+            <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 py-3 z-50 animate-in fade-in zoom-in-95 duration-200">
+              <div className="px-3">
+                {/* find current board data and pass to BoardMembers */}
+                {(() => {
+                  const current = boards.find((b) => b.id === currentBoardId);
+                  const boardName = current?.name || "Untitled";
+                  const ownerId = current?.owner_id || null;
+                  const members = current?.members || [];
+                  return (
+                    <BoardMembers boardId={currentBoardId} boardName={boardName} ownerId={ownerId} members={members} />
+                  );
+                })()}
               </div>
             </div>
           )}
