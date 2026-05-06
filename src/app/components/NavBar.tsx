@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, FileClock } from "lucide-react";
+import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import boardifyLogo from "../../../asset/Boardify.png";
 
@@ -13,35 +13,49 @@ interface NavBarProps {
   onNewTask: () => void;
   activeView: UserView;
   onViewChange: (view: UserView) => void;
-  // ── TAMBAH 2 props ini (fitur search) ──
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  // Props Baru untuk fitur Board
+  boards: any[];
+  currentBoardId: string | null;
+  onSwitchBoard: (id: string, name: string) => void;
+  onCreateBoard: (name: string) => void;
 }
 
-export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSearchChange }: NavBarProps) {
+export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSearchChange, boards, currentBoardId, onSwitchBoard, onCreateBoard }: NavBarProps) {
   const router = useRouter();
   const [searchFocused, setSearchFocused] = useState(false);
-  // HAPUS: const [searchQuery, setSearchQuery] = useState("");
-  // searchQuery sekarang dari props page.tsx
-
   const [userName, setUserName] = useState("Loading...");
   const [userEmail, setUserEmail] = useState("");
   const [userInitials, setUserInitials] = useState("--");
 
   const [activeDropdown, setActiveDropdown] = useState<"projects" | "notifications" | "profile" | null>(null);
+  
+  // State untuk buat board baru secara inline
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+  const [newBoardName, setNewBoardName] = useState("");
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const createInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setActiveDropdown(null);
         setSearchFocused(false);
+        setIsCreatingBoard(false);
+        setNewBoardName("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isCreatingBoard && createInputRef.current) {
+      createInputRef.current.focus();
+    }
+  }, [isCreatingBoard]);
 
   useEffect(() => {
     async function fetchUser() {
@@ -97,20 +111,28 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
     e.stopPropagation();
     if (activeDropdown === name) {
       setActiveDropdown(null);
+      setIsCreatingBoard(false);
     } else {
       setActiveDropdown(name);
       setSearchFocused(false);
     }
   };
 
+  const submitNewBoard = () => {
+    if (newBoardName.trim().length > 0) {
+      onCreateBoard(newBoardName.trim());
+      setIsCreatingBoard(false);
+      setNewBoardName("");
+      setActiveDropdown(null);
+    }
+  };
+
   return (
     <nav className="h-16 bg-white border-b border-gray-100 flex items-center px-6 gap-4 sticky top-0 z-50" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }} ref={dropdownRef}>
-      {/* Logo */}
       <div className="flex items-center min-w-fit">
         <Image src={boardifyLogo} alt="Boardify logo" className="h-9 w-auto" priority />
       </div>
 
-      {/* Project selector */}
       <div className="relative ml-2">
         <div
           onClick={(e) => toggleDropdown("projects", e)}
@@ -119,22 +141,72 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
           <span className="text-sm text-gray-500 font-medium">My Projects</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${activeDropdown === 'projects' ? 'rotate-180' : ''}`} />
         </div>
+        
         {activeDropdown === "projects" && (
-          <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Recent Projects</div>
-            <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors"><Folder size={16} /> Q2 Product Sprint</button>
-            <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors"><Folder size={16} /> Marketing Website</button>
-            <button className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors"><Folder size={16} /> Mobile App Redesign</button>
+          <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Your Boards</div>
+            
+            <div className="max-h-[250px] overflow-y-auto">
+              {boards.map((board) => (
+                <button 
+                  key={board.id}
+                  onClick={() => {
+                    onSwitchBoard(board.id, board.name);
+                    setActiveDropdown(null);
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between gap-3 transition-colors ${
+                    currentBoardId === board.id 
+                    ? "bg-indigo-50 text-indigo-700 font-medium" 
+                    : "text-gray-700 hover:bg-gray-50 hover:text-indigo-600"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Folder size={16} className={currentBoardId === board.id ? "text-indigo-500" : "text-gray-400"} /> 
+                    <span className="truncate max-w-[140px]">{board.name}</span>
+                  </div>
+                  {currentBoardId === board.id && <CheckCircle2 size={14} className="text-indigo-600" />}
+                </button>
+              ))}
+            </div>
+
             <div className="h-px bg-gray-100 my-1"></div>
-            <button className="w-full text-left px-4 py-2 text-sm text-indigo-600 font-medium hover:bg-indigo-50 flex items-center gap-2 transition-colors"><Plus size={16} /> Create New Project</button>
+            
+            {isCreatingBoard ? (
+              <div className="px-4 py-2">
+                <input
+                  ref={createInputRef}
+                  type="text"
+                  placeholder="Board name..."
+                  value={newBoardName}
+                  onChange={(e) => setNewBoardName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitNewBoard();
+                    if (e.key === "Escape") setIsCreatingBoard(false);
+                  }}
+                  className="w-full px-3 py-1.5 text-sm border border-indigo-300 rounded-md outline-none focus:ring-2 focus:ring-indigo-100 mb-2"
+                />
+                <div className="flex gap-2">
+                  <button onClick={submitNewBoard} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex-1">Save</button>
+                  <button onClick={() => setIsCreatingBoard(false)} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200 flex-1">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCreatingBoard(true);
+                }} 
+                className="w-full text-left px-4 py-2 text-sm text-indigo-600 font-medium hover:bg-indigo-50 flex items-center gap-2 transition-colors"
+              >
+                <Plus size={16} /> Create New Board
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Divider */}
       <div className="hidden md:block w-px h-5 bg-gray-200 mx-1" />
 
-      {/* Main view nav */}
       <div className="hidden lg:flex items-center gap-1 rounded-xl p-1" style={{ background: "#f5f6fa" }}>
         {[
           { key: "board" as const, label: "Board", icon: LayoutGrid },
@@ -161,12 +233,11 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
         })}
       </div>
 
-      {/* Search — value & onChange dari props page.tsx */}
       <div className={`relative flex-1 max-w-sm transition-all duration-200 ${searchFocused ? "max-w-md" : ""}`}>
         <Search size={15} className={`absolute left-3 top-1/2 -translate-y-1/2 ${searchFocused ? 'text-indigo-500' : 'text-gray-400'}`} />
         <input
           type="text"
-          placeholder="Search tasks, projects, or people..."
+          placeholder="Search tasks..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           onClick={(e) => {
@@ -187,32 +258,9 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
             <X size={14} />
           </button>
         )}
-        {!searchQuery && !searchFocused && (
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">⌘K</kbd>
-        )}
-        {/* Dropdown Search Results */}
-        {searchFocused && searchQuery.length > 0 && (
-          <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Search Results</div>
-            <div className="px-4 py-2 hover:bg-gray-50 cursor-pointer">
-              <p className="text-sm font-medium text-gray-800">Implement {searchQuery} API</p>
-              <p className="text-xs text-gray-500">In: Q2 Product Sprint &gt; Development</p>
-            </div>
-            <div className="px-4 py-2 hover:bg-gray-50 cursor-pointer">
-              <p className="text-sm font-medium text-gray-800">Design {searchQuery} UI Mockups</p>
-              <p className="text-xs text-gray-500">In: Mobile App Redesign &gt; Design</p>
-            </div>
-            <div className="h-px bg-gray-100 my-1"></div>
-            <div className="px-4 py-2 text-sm text-indigo-600 font-medium hover:bg-indigo-50 cursor-pointer text-center">
-              See all results for "{searchQuery}"
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Right side */}
       <div className="flex items-center gap-2 ml-auto">
-        {/* Notification bell */}
         <div className="relative">
           <button
             onClick={(e) => toggleDropdown("notifications", e)}
@@ -225,33 +273,14 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
             <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
               <div className="px-4 py-2 flex justify-between items-center border-b border-gray-50">
                 <span className="text-sm font-bold text-gray-800">Notifications</span>
-                <span className="text-xs text-indigo-600 font-medium cursor-pointer hover:underline">Mark all as read</span>
               </div>
-              <div className="max-h-[300px] overflow-y-auto">
-                <div className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex gap-3 border-l-2 border-indigo-500 bg-indigo-50/30">
-                  <div className="mt-0.5 bg-blue-100 p-1.5 rounded-full text-blue-600 shrink-0"><MessageSquare size={14} /></div>
-                  <div>
-                    <p className="text-sm text-gray-800"><span className="font-bold">Alex M.</span> commented on <span className="font-medium">Design landing page</span></p>
-                    <p className="text-xs text-gray-500 mt-0.5">"Looks great! I'll start implementing this..."</p>
-                    <p className="text-[10px] text-gray-400 mt-1">10 mins ago</p>
-                  </div>
-                </div>
-                <div className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex gap-3">
-                  <div className="mt-0.5 bg-green-100 p-1.5 rounded-full text-green-600 shrink-0"><CheckCircle2 size={14} /></div>
-                  <div>
-                    <p className="text-sm text-gray-800"><span className="font-bold">Sara K.</span> moved <span className="font-medium">Setup database</span> to Done</p>
-                    <p className="text-[10px] text-gray-400 mt-1">2 hours ago</p>
-                  </div>
-                </div>
-              </div>
-              <div className="border-t border-gray-50 px-4 py-2 text-center text-xs text-gray-500 font-medium hover:text-gray-800 cursor-pointer transition-colors mt-1">
-                View all notifications
+              <div className="px-4 py-8 text-center text-gray-400 text-sm">
+                No new notifications
               </div>
             </div>
           )}
         </div>
 
-        {/* Avatar / Profile */}
         <div className="relative">
           <button
             onClick={(e) => toggleDropdown("profile", e)}
@@ -272,33 +301,21 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
                 <p className="text-sm font-bold text-gray-800">{userName}</p>
                 <p className="text-xs text-gray-500 mt-0.5 truncate">{userEmail || "user@boardify.com"}</p>
               </div>
-              <button
-                onClick={() => router.push('/admin/settings')}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-              >
+              <button onClick={() => router.push('/admin/settings')} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors">
                 <Settings size={16} className="text-gray-400" /> Account Settings
               </button>
               <div className="h-px bg-gray-100 my-1"></div>
-              <button
-                onClick={handleLogout}
-                className="w-full text-left px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-3 transition-colors"
-              >
+              <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-3 transition-colors">
                 <LogOut size={16} className="text-red-500" /> Sign Out
               </button>
             </div>
           )}
         </div>
 
-        {/* Right-side Reports button removed (duplicate) */}
-
-        {/* New Task Button */}
         <button
           onClick={onNewTask}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ml-2"
-          style={{
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            boxShadow: "0 2px 8px rgba(99,102,241,0.35)",
-          }}
+          style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 2px 8px rgba(99,102,241,0.35)" }}
         >
           <Plus size={16} />
           <span className="hidden sm:inline">New Task</span>

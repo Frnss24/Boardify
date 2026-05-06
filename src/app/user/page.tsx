@@ -43,8 +43,10 @@ export default function UserDashboard() {
   const [defaultColumn, setDefaultColumn] = useState<ColumnType>("todo");
   const [activeView, setActiveView] = useState<UserView>("board");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [boards, setBoards] = useState<any[]>([]);
   const [boardId, setBoardId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("My Board");
+  
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -59,8 +61,6 @@ export default function UserDashboard() {
   const [reportSortBy, setReportSortBy] = useState<"dueDate" | "title" | "status">("dueDate");
   const [reportSortDirection, setReportSortDirection] = useState<"asc" | "desc">("asc");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-
-  // ── SEARCH STATE (fitur tugasmu) ──────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
 
   const filterTasks = (list: Task[]) => {
@@ -78,7 +78,6 @@ export default function UserDashboard() {
     doing: filterTasks(tasks.doing),
     done:  filterTasks(tasks.done),
   };
-  // ─────────────────────────────────────────────────────────────
 
   const supabase = useMemo(
     () =>
@@ -109,7 +108,9 @@ export default function UserDashboard() {
     return `${month} ${parsed.getDate()}`;
   };
 
-  const parseDueDateInput = (input: string): string | null => {
+  const parseDueDateInput = (input: string | null | undefined): string | null => {
+    if (!input) return null; 
+
     const trimmed = input.trim();
     if (!trimmed) return null;
 
@@ -121,7 +122,6 @@ export default function UserDashboard() {
       if (monthIndex === undefined || Number.isNaN(dayValue)) return null;
       parsed = new Date(new Date().getFullYear(), monthIndex, dayValue);
     }
-
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed.toISOString().slice(0, 10);
   };
@@ -145,6 +145,31 @@ export default function UserDashboard() {
     return { column, task };
   };
 
+  // Fungsi khusus menarik task untuk suatu board (dipakai saat initial load & saat ganti board)
+  const fetchTasksForBoard = useCallback(async (targetBoardId: string) => {
+    setIsLoading(true);
+    setTasks(initialTasks); // Reset UI agar tidak kedip task lama
+    
+    const { data: tasksData, error: tasksError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('board_id', targetBoardId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+
+    if (tasksError) {
+      console.error('Gagal mengambil task:', tasksError.message);
+    } else {
+      const nextTasks: Record<ColumnType, Task[]> = { todo: [], doing: [], done: [] };
+      (tasksData || []).forEach((row: any) => {
+        const mapped = mapDbTaskToUi(row);
+        nextTasks[mapped.column].push(mapped.task);
+      });
+      setTasks(nextTasks);
+    }
+    setIsLoading(false);
+  }, [supabase]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -165,84 +190,88 @@ export default function UserDashboard() {
         setUserId(sessionUser.id);
         setUserEmail(sessionUser.email || "");
 
+        // Ambil SEMUA board, hilangkan .limit(1)
         const { data: boardsData, error: boardsError } = await supabase
           .from('boards')
           .select('*')
           .eq('owner_id', sessionUser.id)
           .is('deleted_at', null)
-          .order('created_at', { ascending: true })
-          .limit(1);
+          .order('created_at', { ascending: true });
 
-        if (boardsError) {
-          throw new Error(boardsError.message || 'Gagal mengambil board');
-        }
+        if (boardsError) throw new Error(boardsError.message || 'Gagal mengambil board');
 
         let activeBoard = boardsData?.[0] ?? null;
 
+        // default board kalo user blm bikin
         if (!activeBoard) {
           const { data: createdBoard, error: createBoardError } = await supabase
             .from('boards')
-            .insert([
-              {
+            .insert([{
                 name: 'My Board',
                 description: 'Personal task board',
                 owner_id: sessionUser.id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-              },
-            ])
+              }])
             .select()
             .single();
 
-          if (createBoardError || !createdBoard) {
-            throw new Error(createBoardError?.message || 'Gagal membuat board');
-          }
-
+          if (createBoardError || !createdBoard) throw new Error(createBoardError?.message || 'Gagal membuat board');
           activeBoard = createdBoard;
+          setBoards([activeBoard]);
+        } else {
+          setBoards(boardsData || []);
         }
 
         if (!isMounted) return;
 
         setBoardId(activeBoard.id);
         setBoardName(activeBoard.name || 'My Board');
+        
+        await fetchTasksForBoard(activeBoard.id);
 
-        const { data: tasksData, error: tasksError } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('board_id', activeBoard.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
-
-        if (tasksError) {
-          throw new Error(tasksError.message || 'Gagal mengambil task');
-        }
-
-        const nextTasks: Record<ColumnType, Task[]> = {
-          todo: [],
-          doing: [],
-          done: [],
-        };
-
-        (tasksData || []).forEach((row: any) => {
-          const mapped = mapDbTaskToUi(row);
-          nextTasks[mapped.column].push(mapped.task);
-        });
-
-        setTasks(nextTasks);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Gagal memuat data';
         setLoadError(message);
-      } finally {
         setIsLoading(false);
       }
     };
 
     void loadData();
+    return () => { isMounted = false; };
+  }, [supabase, fetchTasksForBoard]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [supabase]);
+  // Fungsi Ganti Board
+  const handleSwitchBoard = (newBoardId: string, newBoardName: string) => {
+    setBoardId(newBoardId);
+    setBoardName(newBoardName);
+    fetchTasksForBoard(newBoardId);
+  };
+
+  // Fungsi Bikin Board Baru
+  const handleCreateBoard = async (newBoardName: string) => {
+    if (!userId) return;
+    
+    const { data: createdBoard, error } = await supabase
+      .from('boards')
+      .insert([{
+          name: newBoardName,
+          description: 'New board',
+          owner_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (error || !createdBoard) {
+      console.error('Failed to create board:', error?.message);
+      return;
+    }
+
+    setBoards([...boards, createdBoard]);
+    handleSwitchBoard(createdBoard.id, createdBoard.name);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -255,15 +284,12 @@ export default function UserDashboard() {
       setReportFeedback("User session tidak valid. Coba login ulang.");
       return;
     }
-
     if (!reportTitle.trim() || !reportMessage.trim()) {
       setReportFeedback("Judul dan isi report wajib diisi.");
       return;
     }
-
     setReportSubmitting(true);
     setReportFeedback(null);
-
     const response = await fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -274,14 +300,12 @@ export default function UserDashboard() {
         message: reportMessage.trim(),
       }),
     });
-
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       setReportFeedback(payload.error || 'Gagal mengirim report. Coba lagi.');
       setReportSubmitting(false);
       return;
     }
-
     setReportFeedback('Report berhasil dikirim ke admin.');
     setReportSubmitting(false);
     setReportTitle('');
@@ -295,11 +319,9 @@ export default function UserDashboard() {
 
   const handleAddTask = async (task: Task, column: ColumnType) => {
     if (!boardId) return;
-
     const { data: createdTask, error: createError } = await supabase
       .from('tasks')
-      .insert([
-        {
+      .insert([{
           board_id: boardId,
           assignee_id: userId,
           title: task.title,
@@ -309,8 +331,7 @@ export default function UserDashboard() {
           due_date: parseDueDateInput(task.dueDate),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        },
-      ])
+        }])
       .select()
       .single();
 
@@ -318,7 +339,6 @@ export default function UserDashboard() {
       console.error('Failed to create task:', createError?.message || 'Unknown error');
       return;
     }
-
     const mapped = mapDbTaskToUi(createdTask);
     setTasks((prev) => ({
       ...prev,
@@ -332,21 +352,13 @@ export default function UserDashboard() {
       const fromList = prev[from].filter((t) => t.id !== taskId);
       const moved = prev[from].find((t) => t.id === taskId);
       if (!moved) return prev;
-      return {
-        ...prev,
-        [from]: fromList,
-        [to]: [moved, ...prev[to]],
-      };
+      return { ...prev, [from]: fromList, [to]: [moved, ...prev[to]] };
     });
-
     const { error: updateError } = await supabase
       .from('tasks')
       .update({ status: to, updated_at: new Date().toISOString() })
       .eq('id', taskId);
-
-    if (updateError) {
-      console.error('Failed to update task status:', updateError.message);
-    }
+    if (updateError) console.error('Failed to update task status:', updateError.message);
   }, [supabase]);
 
   const findTaskColumn = (taskId: string): ColumnType | null => {
@@ -363,7 +375,6 @@ export default function UserDashboard() {
 
   const handleSaveTask = async (updatedTask: Task, column: ColumnType) => {
     if (!boardId) return;
-
     const { error: updateError } = await supabase
       .from('tasks')
       .update({
@@ -380,7 +391,6 @@ export default function UserDashboard() {
       console.error('Failed to save task:', updateError.message);
       return;
     }
-
     const oldColumn = findTaskColumn(updatedTask.id);
     if (oldColumn) {
       setTasks((prev) => ({
@@ -392,7 +402,6 @@ export default function UserDashboard() {
         }),
       }));
     }
-
     setEditingTask(null);
     setModalOpen(false);
   };
@@ -417,10 +426,8 @@ export default function UserDashboard() {
         const bKey = b.start ? b.start.getTime() : b.due.getTime();
         return aKey - bKey;
       });
-
     const anchor = rows.length > 0 ? new Date(rows[0].start || rows[0].due) : new Date();
     anchor.setDate(anchor.getDate() - 2);
-
     return rows.map((row) => {
       const realStart = row.start || row.due;
       const startOffset = Math.max(0, diffInDays(anchor, realStart));
@@ -590,16 +597,19 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f5f6fa 0%, #eef0f8 50%, #f0eef8 100%)" }}>
-      {/* Nav — kirim searchQuery & onSearchChange */}
+      {/* UPDATE Props NavBar */}
       <NavBar
         onNewTask={() => openModal("todo")}
         activeView={activeView}
         onViewChange={setActiveView}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        boards={boards}
+        currentBoardId={boardId}
+        onSwitchBoard={handleSwitchBoard}
+        onCreateBoard={handleCreateBoard}
       />
 
-      {/* Board header */}
       <div className="px-6 pt-6 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -620,7 +630,6 @@ export default function UserDashboard() {
             </p>
           </div>
 
-          {/* Toolbar & Logout */}
           <div className="flex items-center gap-2">
             <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
               <Filter size={14} />
@@ -646,7 +655,6 @@ export default function UserDashboard() {
                 <List size={15} />
               </button>
             </div>
-
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-red-600 font-bold hover:bg-red-50 transition-colors"
@@ -655,12 +663,8 @@ export default function UserDashboard() {
               <LogOut size={16} />
               <span className="hidden sm:inline">Logout</span>
             </button>
-
             <button
-              onClick={() => {
-                setReportOpen(true);
-                setReportFeedback(null);
-              }}
+              onClick={() => { setReportOpen(true); setReportFeedback(null); }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm text-amber-700 font-bold hover:bg-amber-50 transition-colors"
               style={{ border: "1px solid rgba(217, 119, 6, 0.25)", background: "white" }}
             >
@@ -671,7 +675,6 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="px-6 pb-4">
         <div className="flex items-center gap-3">
           <div className="flex-1 h-1.5 bg-white rounded-full overflow-hidden" style={{ boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)" }}>
@@ -689,12 +692,11 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Board view — pakai filteredTasks supaya search bekerja */}
       {activeView === "board" && (
         <div className="flex-1 px-6 pb-8">
           <DndProvider backend={HTML5Backend}>
             {isLoading ? (
-              <div className="text-sm text-gray-500">Loading tasks...</div>
+              <div className="flex items-center justify-center h-40 text-sm text-gray-500">Loading tasks...</div>
             ) : loadError ? (
               <div className="text-sm text-red-500">{loadError}</div>
             ) : (
@@ -712,12 +714,7 @@ export default function UserDashboard() {
                         .from('tasks')
                         .update({ deleted_at: new Date().toISOString() })
                         .eq('id', id);
-
-                      if (deleteError) {
-                        console.error('Failed to delete task:', deleteError.message);
-                        return;
-                      }
-
+                      if (deleteError) { console.error('Failed to delete task:', deleteError.message); return; }
                       setTasks((prev) => ({
                         todo: prev.todo.filter((t) => t.id !== id),
                         doing: prev.doing.filter((t) => t.id !== id),
@@ -727,16 +724,8 @@ export default function UserDashboard() {
                   }}
                   onDeleteTaskPermanently={(id) => {
                     void (async () => {
-                      const { error: deleteError } = await supabase
-                        .from('tasks')
-                        .delete()
-                        .eq('id', id);
-
-                      if (deleteError) {
-                        console.error('Failed to permanently delete task:', deleteError.message);
-                        return;
-                      }
-
+                      const { error: deleteError } = await supabase.from('tasks').delete().eq('id', id);
+                      if (deleteError) { console.error('Failed to permanently delete task:', deleteError.message); return; }
                       setTasks((prev) => ({
                         todo: prev.todo.filter((t) => t.id !== id),
                         doing: prev.doing.filter((t) => t.id !== id),
@@ -753,7 +742,6 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Timeline view — tidak berubah sama sekali */}
       {activeView === "timeline" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 p-5" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
@@ -763,11 +751,9 @@ export default function UserDashboard() {
             </div>
             <div className="space-y-3">
               {timelineRows.map((item) => {
-                // compute approximate start date from due date and length
                 const dueObj = item.due instanceof Date ? item.due : new Date(item.due);
                 const approxStart = new Date(dueObj);
                 approxStart.setDate(approxStart.getDate() - Math.max(0, (item.length || 1) - 1));
-
                 const fmt = (d: Date) => d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString() : '-';
 
                 return (
@@ -780,15 +766,8 @@ export default function UserDashboard() {
                       <div
                         className="absolute top-1 bottom-1 rounded-md flex items-center px-2 text-[11px] text-white"
                         style={{
-                          left: `${item.start * 3.1}%`,
-                          width: `${item.length * 3.1}%`,
-                          minWidth: "68px",
-                          background:
-                            item.status === "done"
-                              ? "linear-gradient(135deg, #10b981, #059669)"
-                              : item.status === "doing"
-                              ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                              : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                          left: `${item.start * 3.1}%`, width: `${item.length * 3.1}%`, minWidth: "68px",
+                          background: item.status === "done" ? "linear-gradient(135deg, #10b981, #059669)" : item.status === "doing" ? "linear-gradient(135deg, #f59e0b, #d97706)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
                         }}
                       >
                         {fmt(approxStart)} → {item.dueDate}
@@ -802,7 +781,6 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Reports view — tidak berubah sama sekali */}
       {activeView === "reports" && (
         <div className="flex-1 px-6 pb-8">
           <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
@@ -1036,52 +1014,26 @@ export default function UserDashboard() {
           <div className="w-full max-w-xl rounded-2xl bg-white border border-gray-100 shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-900">Submit Report</h2>
-              <button
-                onClick={() => setReportOpen(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-              >
+              <button onClick={() => setReportOpen(false)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
                 <X size={16} />
               </button>
             </div>
-
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Title</label>
-                <input
-                  value={reportTitle}
-                  onChange={(event) => setReportTitle(event.target.value)}
-                  placeholder="Contoh: Task assignment bermasalah"
-                  className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-                />
+                <input value={reportTitle} onChange={(e) => setReportTitle(e.target.value)} placeholder="Contoh: Task assignment bermasalah" className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200" />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Details</label>
-                <textarea
-                  value={reportMessage}
-                  onChange={(event) => setReportMessage(event.target.value)}
-                  placeholder="Jelaskan issue atau complaint kamu"
-                  className="w-full border rounded-lg px-3 py-2 text-sm min-h-[140px] outline-none focus:ring-2 focus:ring-indigo-200"
-                />
+                <textarea value={reportMessage} onChange={(e) => setReportMessage(e.target.value)} placeholder="Jelaskan issue atau complaint kamu" className="w-full border rounded-lg px-3 py-2 text-sm min-h-[140px] outline-none focus:ring-2 focus:ring-indigo-200" />
               </div>
               {reportFeedback && (
-                <p className={`text-sm ${reportFeedback.toLowerCase().includes('berhasil') ? 'text-green-600' : 'text-red-600'}`}>
-                  {reportFeedback}
-                </p>
+                <p className={`text-sm ${reportFeedback.toLowerCase().includes('berhasil') ? 'text-green-600' : 'text-red-600'}`}>{reportFeedback}</p>
               )}
             </div>
-
             <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => setReportOpen(false)}
-                className="px-4 py-2 rounded-lg text-sm text-gray-700 bg-gray-100 hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void handleSubmitReport()}
-                disabled={reportSubmitting}
-                className="px-4 py-2 rounded-lg text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
-              >
+              <button onClick={() => setReportOpen(false)} className="px-4 py-2 rounded-lg text-sm text-gray-700 bg-gray-100 hover:bg-gray-200">Cancel</button>
+              <button onClick={() => void handleSubmitReport()} disabled={reportSubmitting} className="px-4 py-2 rounded-lg text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300">
                 {reportSubmitting ? 'Sending...' : 'Send Report'}
               </button>
             </div>
