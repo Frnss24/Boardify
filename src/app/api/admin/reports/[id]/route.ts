@@ -18,10 +18,22 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl) {
+      console.error('NEXT_PUBLIC_SUPABASE_URL is not set');
+      return NextResponse.json({ error: 'Configuration error: missing supabase URL' }, { status: 500 });
+    }
+
+    const key = serviceRoleKey || anonKey;
+    if (!key) {
+      console.error('Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is set');
+      return NextResponse.json({ error: 'Configuration error: missing API key' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, key);
 
     const { error } = await supabase
       .from('reports')
@@ -33,12 +45,17 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       .eq('id', id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('Supabase update error:', error.message, error.details);
+      return NextResponse.json(
+        { error: `Database error: ${error.message}` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Update report error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Server error: ${message}` }, { status: 500 });
   }
 }

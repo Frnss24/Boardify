@@ -41,10 +41,22 @@ export async function GET() {
       return d;
     };
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl) {
+      console.error('NEXT_PUBLIC_SUPABASE_URL is not set');
+      return NextResponse.json({ error: 'Configuration error: missing supabase URL' }, { status: 500 });
+    }
+
+    const key = serviceRoleKey || anonKey;
+    if (!key) {
+      console.error('Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is set');
+      return NextResponse.json({ error: 'Configuration error: missing API key' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, key);
 
     const [tasksResult, usersResult, boardsResult, reportsResult] = await Promise.all([
       supabase
