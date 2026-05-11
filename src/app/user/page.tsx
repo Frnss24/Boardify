@@ -9,6 +9,7 @@ import { NavBar, UserView } from "../components/NavBar";
 import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { ShareBoardModal } from "../components/ShareBoardModal";
+import { ReportHistory } from "../components/ReportHistory";
 import { Task } from "../components/TaskCard";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 
@@ -439,26 +440,39 @@ export default function UserDashboard() {
     }
     setReportSubmitting(true);
     setReportFeedback(null);
-    const response = await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        reporter_id: userId,
-        reporter_email: userEmail,
-        title: reportTitle.trim(),
-        message: reportMessage.trim(),
-      }),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setReportFeedback(payload.error || 'Gagal mengirim report. Coba lagi.');
+    
+    try {
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reporter_id: userId,
+          reporter_email: userEmail,
+          title: reportTitle.trim(),
+          message: reportMessage.trim(),
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({ error: 'Invalid response from server' }));
+
+      if (!response.ok) {
+        const errorMsg = payload.error || `Server error: ${response.status}`;
+        console.error('Submit report failed:', errorMsg);
+        setReportFeedback(errorMsg);
+        setReportSubmitting(false);
+        return;
+      }
+
+      setReportFeedback('Report berhasil dikirim ke admin. Cek di halaman History untuk melihat status.');
       setReportSubmitting(false);
-      return;
+      setReportTitle('');
+      setReportMessage('');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Network error saat mengirim report';
+      console.error('Submit report error:', error);
+      setReportFeedback(errorMsg);
+      setReportSubmitting(false);
     }
-    setReportFeedback('Report berhasil dikirim ke admin.');
-    setReportSubmitting(false);
-    setReportTitle('');
-    setReportMessage('');
   };
 
   const openModal = useCallback((column: ColumnType = "todo") => {
@@ -785,17 +799,19 @@ export default function UserDashboard() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600" style={{ fontWeight: 600 }}>
-                {activeView === "board" ? "Active Board" : activeView === "timeline" ? "Gantt Timeline" : "Task Reports"}
+                {activeView === "board" ? "Active Board" : activeView === "timeline" ? "Gantt Timeline" : activeView === "report-history" ? "Report History" : "Task Reports"}
               </span>
             </div>
             <h1 className="text-gray-900" style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.03em" }}>
-              {activeView === "board" ? boardName : activeView === "timeline" ? "Sprint Timeline" : "Task History Reports"}
+              {activeView === "board" ? boardName : activeView === "timeline" ? "Sprint Timeline" : activeView === "report-history" ? "Report History" : "Task History Reports"}
             </h1>
             <p className="text-gray-400 mt-0.5" style={{ fontSize: "0.8rem" }}>
               {activeView === "board"
                 ? `${totalTasks} total tasks · ${completed} completed · ${inProgress} in progress · ${pending} pending`
                 : activeView === "timeline"
                 ? `Visual timeline for ${totalTasks} tasks across all statuses`
+                : activeView === "report-history"
+                ? `View your submitted reports and admin feedback`
                 : `Unified history from To Do, Doing, and Done (${totalTasks} tasks)`}
             </p>
           </div>
@@ -1295,6 +1311,20 @@ export default function UserDashboard() {
                   </tbody>
                 </table>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeView === "report-history" && (
+        <div className="flex-1 px-6 pb-8">
+          <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden" style={{ boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)" }}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2 text-gray-800" style={{ fontWeight: 700 }}>
+              <History size={18} />
+              <span>Your Report History</span>
+            </div>
+            <div className="px-5 py-6">
+              <ReportHistory userId={userId} />
             </div>
           </div>
         </div>

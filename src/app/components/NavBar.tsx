@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, Users } from "lucide-react";
+import { Search, Bell, Plus, ChevronDown, LogOut, Settings, Folder, CheckCircle2, MessageSquare, X, LayoutGrid, ChartNoAxesGantt, Users, History } from "lucide-react";
 import { BoardMembers } from "./BoardMembers";
 import { createBrowserClient } from "@supabase/ssr";
 import boardifyLogo from "../../../asset/Boardify.png";
 import { isInvalidRefreshTokenError } from "@/lib/auth-utils";
 
-export type UserView = "board" | "timeline" | "reports";
+export type UserView = "board" | "timeline" | "reports" | "report-history";
 
 interface NavBarProps {
   onNewTask: () => void;
@@ -224,6 +224,7 @@ export function NavBar({ onNewTask, activeView, onViewChange, searchQuery, onSea
           { key: "board" as const, label: "Board", icon: LayoutGrid },
           { key: "timeline" as const, label: "Timeline", icon: ChartNoAxesGantt },
           { key: "reports" as const, label: "Reports", icon: null },
+          { key: "report-history" as const, label: "History", icon: History },
         ].map((item) => {
           const isActive = activeView === item.key;
           return (
