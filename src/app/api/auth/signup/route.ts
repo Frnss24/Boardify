@@ -51,31 +51,45 @@ export async function POST(req: Request) {
     });
 
     if (error || !data.user) {
+      console.error('Auth user creation error:', error);
       return NextResponse.json(
-        { error: error?.message || 'Gagal membuat user' },
+        { error: error?.message || 'Gagal membuat user di auth' },
         { status: 400 }
       );
     }
 
-    // Insert ke tabel users
-    const { error: userError } = await supabase
-      .from('users')
-      .upsert({
-        id: data.user.id,
-        email: normalizedEmail,
-        role,
-        name: normalizedName,
-        password_hash: 'managed-by-supabase-auth',
-        created_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
+    // Tunggu sebentar agar trigger execute
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (userError) {
-      console.error('User record creation error:', userError);
-      await supabase.auth.admin.deleteUser(data.user.id);
-      return NextResponse.json(
-        { error: userError.message },
-        { status: 500 }
-      );
+    // Verify user sudah di tabel users (dari trigger)
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', data.user.id)
+      .single();
+
+    if (checkError || !existingUser) {
+      console.error('User not synced to users table. Trigger might not be active.', checkError);
+      // Manual insert sebagai fallback
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email: normalizedEmail,
+          role,
+          name: normalizedName,
+          password_hash: 'managed-by-supabase-auth',
+          created_at: new Date().toISOString(),
+        });
+
+      if (userError) {
+        console.error('Fallback insert error:', userError);
+        await supabase.auth.admin.deleteUser(data.user.id);
+        return NextResponse.json(
+          { error: `Database error: ${userError.message || JSON.stringify(userError)}` },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({

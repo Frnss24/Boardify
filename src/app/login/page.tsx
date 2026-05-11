@@ -6,7 +6,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import boardifyLogo from '../../../asset/Boardify.png'; 
+import boardifyLogo from '../../../asset/Boardify.png';
+
+const createSupabaseClient = () => createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,10 +33,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
+      const supabase = createSupabaseClient();
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: identifier.trim().toLowerCase(),
@@ -173,7 +175,8 @@ export default function LoginPage() {
                 alt="Boardify Logo" 
                 fill 
                 className="object-contain"
-                priority
+                priority={false}
+                loading="lazy"
               />
             </div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tighter">Boardify</h2>

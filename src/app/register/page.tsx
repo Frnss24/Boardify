@@ -5,7 +5,6 @@ import { ChevronLeft, User, Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } f
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
 import boardifyLogo from '../../../asset/Boardify.png'; 
 
 export default function RegisterPage() {
@@ -17,11 +16,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false); 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,19 +46,21 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: {
-            full_name: fullName.trim(),
-            role: 'user',
-          },
-        },
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          role: 'user',
+          name: fullName.trim(),
+        }),
       });
 
-      if (signUpError || !data.user) {
-        setError(signUpError?.message || 'Sign up gagal');
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        setError(result.error || 'Pendaftaran gagal');
         return;
       }
 
@@ -99,7 +95,7 @@ export default function RegisterPage() {
         <div className="hidden md:flex flex-[0.8] bg-white p-12 flex flex-col items-center justify-center relative border-r border-slate-100">
           <div className="flex flex-col items-center text-center">
             <div className="w-32 h-32 relative mb-4">
-              <Image src={boardifyLogo} alt="Boardify Logo" fill className="object-contain" priority />
+              <Image src={boardifyLogo} alt="Boardify Logo" fill className="object-contain" priority={false} loading="lazy" />
             </div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tighter">Boardify</h2>
           </div>
