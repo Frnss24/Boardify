@@ -10,6 +10,7 @@ import { KanbanColumn, ColumnType } from "../components/KanbanColumn";
 import { NewTaskModal } from "../components/NewTaskModal";
 import { ShareBoardModal } from "../components/ShareBoardModal";
 import { Task } from "../components/TaskCard";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
@@ -37,6 +38,28 @@ function parseDueDate(label: string): Date {
 function diffInDays(from: Date, to: Date): number {
   const ms = to.getTime() - from.getTime();
   return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
+
+function getDueState(dueDate: string | null) {
+  if (!dueDate) {
+    return { daysLeft: null, isOverdue: false, isDueSoon: false };
+  }
+
+  const due = parseDueDate(dueDate);
+  if (Number.isNaN(due.getTime())) {
+    return { daysLeft: null, isOverdue: false, isDueSoon: false };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  const daysLeft = diffInDays(today, due);
+
+  return {
+    daysLeft,
+    isOverdue: daysLeft < 0,
+    isDueSoon: daysLeft >= 0 && daysLeft <= 2,
+  };
 }
 
 export default function UserDashboard() {
@@ -93,6 +116,40 @@ export default function UserDashboard() {
     doing: filterTasks(tasks.doing),
     done:  filterTasks(tasks.done),
   };
+
+  const deadlineAlerts = useMemo(() => {
+    const alerts: Array<{
+      task: Task;
+      column: ColumnType;
+      daysLeft: number;
+      isOverdue: boolean;
+    }> = [];
+
+    (['todo', 'doing'] as ColumnType[]).forEach((column) => {
+      tasks[column].forEach((task) => {
+        const { daysLeft, isOverdue, isDueSoon } = getDueState(task.dueDate);
+        if (daysLeft === null) return;
+        if (isOverdue || isDueSoon) {
+          alerts.push({ task, column, daysLeft, isOverdue });
+        }
+      });
+    });
+
+    return alerts.sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      return a.daysLeft - b.daysLeft;
+    });
+  }, [tasks]);
+
+  const overdueCount = deadlineAlerts.filter((alert) => alert.isOverdue).length;
+  const dueSoonCount = deadlineAlerts.filter((alert) => !alert.isOverdue).length;
+
+  const deadlinePreview = useMemo(() => {
+    return deadlineAlerts.slice(0, 3).map((alert) => {
+      if (alert.isOverdue) return `${alert.task.title} (telat)`;
+      return `${alert.task.title} (${alert.daysLeft} hari lagi)`;
+    }).join(", ");
+  }, [deadlineAlerts]);
 
   const currentBoard = useMemo(
     () => boards.find((board) => board.id === boardId) || null,
@@ -780,6 +837,24 @@ export default function UserDashboard() {
           </span>
         </div>
       </div>
+
+      {(overdueCount > 0 || dueSoonCount > 0) && (
+        <div className="px-6 pb-4">
+          <Alert variant={overdueCount > 0 ? "destructive" : "default"} className="rounded-3xl">
+            <MessageSquareWarning className="text-current" />
+            <AlertTitle>
+              {overdueCount > 0
+                ? `${overdueCount} task sudah lewat deadline`
+                : `${dueSoonCount} task mendekati deadline`}
+            </AlertTitle>
+            <AlertDescription>
+              {overdueCount > 0
+                ? `Segera selesaikan task yang terlambat: ${deadlinePreview}.`
+                : `Periksa task berikut agar tidak telat: ${deadlinePreview}.`}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {activeView === "board" && (
         <div className="flex-1 px-6 pb-8">

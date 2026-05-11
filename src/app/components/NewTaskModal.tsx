@@ -48,6 +48,19 @@ export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd, edi
   const [dueDate, setDueDate] = useState("");
   const [startDate, setStartDate] = useState("");
 
+  const todayDate = React.useMemo(() => {
+    return new Date().toISOString().slice(0, 10);
+  }, []);
+
+  const isPastDueDate = (value: string) => {
+    if (!value) return false;
+    const due = new Date(value);
+    due.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return due < today;
+  };
+
   // sync editing -> prefill
   React.useEffect(() => {
     if (editing) {
@@ -268,10 +281,14 @@ export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd, edi
                     <input
                       type="date"
                       value={dueDate}
+                      min={todayDate}
                       onChange={(e) => setDueDate(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                       style={{ background: "#f8f9fc", border: "1.5px solid transparent", color: "#374151" }}
                     />
+                    {isPastDueDate(dueDate) && (
+                      <p className="mt-2 text-xs text-red-500">Tanggal due date tidak boleh sebelum hari ini.</p>
+                    )}
                   </div>
                 </div>
 
@@ -300,11 +317,11 @@ export function NewTaskModal({ open, defaultColumn = "todo", onClose, onAdd, edi
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={!title.trim()}
+                  disabled={!title.trim() || isPastDueDate(dueDate)}
                   className="px-5 py-2.5 rounded-xl text-sm text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
                   style={{
                     background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                    boxShadow: title.trim() ? "0 2px 8px rgba(99,102,241,0.35)" : "none",
+                    boxShadow: title.trim() && !isPastDueDate(dueDate) ? "0 2px 8px rgba(99,102,241,0.35)" : "none",
                   }}
                 >
                   {editing ? 'Save Changes' : 'Create Task'}
