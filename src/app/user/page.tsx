@@ -87,6 +87,12 @@ export default function UserDashboard() {
   const [reportPriorityFilter, setReportPriorityFilter] = useState<"all" | "High" | "Medium" | "Low">("all");
   const [reportSortBy, setReportSortBy] = useState<"dueDate" | "title" | "status">("dueDate");
   const [reportSortDirection, setReportSortDirection] = useState<"asc" | "desc">("asc");
+  const [boardFilterOpen, setBoardFilterOpen] = useState(false);
+  const [boardSortOpen, setBoardSortOpen] = useState(false);
+  const [boardFilterStatus, setBoardFilterStatus] = useState<"all" | ColumnType>("all");
+  const [boardFilterPriority, setBoardFilterPriority] = useState<"all" | "High" | "Medium" | "Low">("all");
+  const [boardSortBy, setBoardSortBy] = useState<"dueDate" | "title">("dueDate");
+  const [boardSortDirection, setBoardSortDirection] = useState<"asc" | "desc">("asc");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
@@ -101,21 +107,47 @@ export default function UserDashboard() {
     timestamp: string;
   };
 
-  const filterTasks = (list: Task[]) => {
-    if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        (t.description ?? "").toLowerCase().includes(q)
-    );
+  const filterTasks = (list: Task[], column: ColumnType) => {
+    let filtered = list;
+
+    if (boardFilterStatus !== "all" && boardFilterStatus !== column) {
+      filtered = [];
+    }
+
+    if (boardFilterPriority !== "all") {
+      filtered = filtered.filter((t) => t.priority === boardFilterPriority);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          (t.description ?? "").toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
   };
 
-  const filteredTasks = {
-    todo:  filterTasks(tasks.todo),
-    doing: filterTasks(tasks.doing),
-    done:  filterTasks(tasks.done),
+  const sortTasks = (list: Task[]) => {
+    return [...list].sort((a, b) => {
+      const direction = boardSortDirection === "asc" ? 1 : -1;
+      if (boardSortBy === "title") {
+        return a.title.localeCompare(b.title) * direction;
+      }
+
+      const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+      const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+      return (aDue - bDue) * direction;
+    });
   };
+
+  const filteredTasks = useMemo(() => ({
+    todo: sortTasks(filterTasks(tasks.todo, "todo")),
+    doing: sortTasks(filterTasks(tasks.doing, "doing")),
+    done: sortTasks(filterTasks(tasks.done, "done")),
+  }), [tasks, searchQuery, boardFilterStatus, boardFilterPriority, boardSortBy, boardSortDirection]);
 
   const deadlineAlerts = useMemo(() => {
     const alerts: Array<{
@@ -768,15 +800,109 @@ export default function UserDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
-              <Filter size={14} />
-              <span className="hidden sm:inline">Filter</span>
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors" style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}>
-              <SlidersHorizontal size={14} />
-              <span className="hidden sm:inline">Sort</span>
-            </button>
+          <div className="flex items-center gap-2 relative">
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setBoardFilterOpen((prev) => !prev);
+                  setBoardSortOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors"
+                style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}
+              >
+                <Filter size={14} />
+                <span className="hidden sm:inline">Filter</span>
+              </button>
+              {boardFilterOpen && activeView === "board" && (
+                <div className="absolute right-0 mt-2 w-72 rounded-3xl bg-white border border-gray-200 shadow-xl p-4 z-20">
+                  <div className="text-sm font-semibold text-gray-900 mb-3">Filter Tasks</div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Status</label>
+                      <select
+                        value={boardFilterStatus}
+                        onChange={(e) => setBoardFilterStatus(e.target.value as "all" | ColumnType)}
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none"
+                      >
+                        <option value="all">All</option>
+                        <option value="todo">To Do</option>
+                        <option value="doing">Doing</option>
+                        <option value="done">Done</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Priority</label>
+                      <select
+                        value={boardFilterPriority}
+                        onChange={(e) => setBoardFilterPriority(e.target.value as "all" | "High" | "Medium" | "Low")}
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none"
+                      >
+                        <option value="all">All</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => setBoardFilterOpen(false)}
+                      className="w-full rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                    >
+                      Apply filter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setBoardSortOpen((prev) => !prev);
+                  setBoardFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-white transition-colors"
+                style={{ border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.7)" }}
+              >
+                <SlidersHorizontal size={14} />
+                <span className="hidden sm:inline">Sort</span>
+              </button>
+              {boardSortOpen && activeView === "board" && (
+                <div className="absolute right-0 mt-2 w-72 rounded-3xl bg-white border border-gray-200 shadow-xl p-4 z-20">
+                  <div className="text-sm font-semibold text-gray-900 mb-3">Sort Tasks</div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Sort by</label>
+                      <select
+                        value={boardSortBy}
+                        onChange={(e) => setBoardSortBy(e.target.value as "dueDate" | "title")}
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none"
+                      >
+                        <option value="dueDate">Due Date</option>
+                        <option value="title">Title</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Direction</label>
+                      <select
+                        value={boardSortDirection}
+                        onChange={(e) => setBoardSortDirection(e.target.value as "asc" | "desc")}
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none"
+                      >
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => setBoardSortOpen(false)}
+                      className="w-full rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                    >
+                      Apply sort
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => setShareOpen(true)}
               disabled={!boardId}
